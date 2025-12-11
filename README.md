@@ -269,3 +269,34 @@ docker compose logs letta
 1. Verify bot token is correct
 2. Check if another instance is running (only one can poll at a time)
 3. For webhooks, ensure URL is publicly accessible with valid HTTPS
+
+### Tools not working / "missing required parameter"
+
+This usually means Letta doesn't know the tool's parameter schema. Check:
+
+1. **Verify tool schema in Letta:**
+   ```bash
+   curl http://localhost:8283/v1/tools/<tool-id> | jq '.json_schema'
+   ```
+   If `properties` is empty `{}`, the schema wasn't registered correctly.
+
+2. **Restart the app** to re-register tools:
+   ```bash
+   # Kill and restart
+   bun run dev
+   ```
+   Watch for "Updated tool 'xxx'" messages in the logs.
+
+3. **Check tool webhook is receiving calls:**
+   Look for `🔧 TOOL WEBHOOK RECEIVED:` in the console output.
+
+4. **Delete and recreate the agent** if tools were registered after agent creation:
+   ```bash
+   # List agents
+   curl http://localhost:8283/v1/agents | jq '.[].id'
+   # Delete problematic agent
+   curl -X DELETE http://localhost:8283/v1/agents/<agent-id>
+   ```
+   The bot will create a new agent on the next message.
+
+See `AGENTS.md` for detailed Letta tool registration requirements.

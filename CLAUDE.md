@@ -135,6 +135,77 @@ Due to a Letta bug with BYOK model handles, agents must be created in two steps:
    });
    ```
 
+### Letta Tool Registration (Critical!)
+
+Custom tools require careful registration. Letta's "auto-extraction from Python source" is unreliable.
+
+**1. json_schema format** - Use Letta's flat format, NOT OpenAI's nested format:
+```typescript
+// WRONG (OpenAI format)
+json_schema: {
+  type: 'function',
+  function: { name, description, parameters }
+}
+
+// CORRECT (Letta format)
+json_schema: {
+  name: 'tool_name',
+  description: 'What it does',
+  parameters: {
+    type: 'object',
+    properties: { /* ... */ },
+    required: ['arg1']
+  }
+}
+```
+
+**2. Always pass json_schema explicitly** - Both on create AND update:
+```typescript
+// When creating
+await client.tools.create({
+  source_code: pythonCode,
+  description: '...',
+  json_schema: { name, description, parameters },  // Required!
+});
+
+// When updating existing tools
+await client.tools.update(toolId, {
+  source_code: pythonCode,
+  description: '...',
+  json_schema: { name, description, parameters },  // Also required!
+});
+```
+
+**3. Python function signatures** - Use explicit typed parameters:
+```python
+# WRONG - Letta won't know what args to pass
+def my_tool(**kwargs):
+    pass
+
+# CORRECT - Explicit parameters
+def my_tool(text: str, priority: int = None):
+    pass
+```
+
+**4. Tool attachment timing** - Attach AFTER agent creation:
+```typescript
+// Tools must be attached after agent is created
+// (tool_ids in create() doesn't work with letta-free)
+const agent = await client.agents.create({ /* ... */ });
+for (const toolId of toolIds) {
+  await client.agents.tools.attach(toolId, { agent_id: agent.id });
+}
+```
+
+**5. Handle existing tools** - Check by name and update instead of failing:
+```typescript
+const existingTools = new Map<string, string>();
+for await (const tool of client.tools.list()) {
+  existingTools.set(tool.name, tool.id);
+}
+// Then update if exists, create if not
+```
+
 ---
 
 ## Code Quality (MANDATORY)
