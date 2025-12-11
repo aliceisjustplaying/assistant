@@ -1,0 +1,19 @@
+model_list:
+  # Claude Opus 4.5 - primary model for this project
+  # Routes through auth-adapter -> anthropic-proxy for OAuth-based auth
+  - model_name: claude-opus-4-5-20251101
+    litellm_params:
+      model: anthropic/claude-opus-4-5-20251101
+      api_base: http://auth-adapter:4002
+      api_key: os.environ/ANTHROPIC_PROXY_SESSION_ID
+
+  # Additional Claude models for flexibility
+  - model_name: claude-sonnet-4-20250514
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_base: http://auth-adapter:4002
+      api_key: os.environ/ANTHROPIC_PROXY_SESSION_ID
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
