@@ -11,7 +11,7 @@
 import { Telegraf, type Context } from 'telegraf';
 import type { Update } from 'telegraf/types';
 import { config } from './config';
-import { getLettaClient } from './letta';
+import { getLettaClient, getRegisteredToolIds } from './letta';
 
 /**
  * Create Telegraf bot instance
@@ -49,6 +49,10 @@ async function getOrCreateAgentForUser(userId: number, username?: string): Promi
     const usernameOrUnknown = username ?? 'unknown';
     console.log(`Creating new agent for user ${userId.toString()} (${usernameOrUnknown})`);
 
+    // Get registered tool IDs to attach to this agent
+    const toolIds = getRegisteredToolIds();
+    console.log(`Attaching ${String(toolIds.length)} tools to new agent`);
+
     // Workaround for Letta bug: openai-proxy/ handles are rejected during creation
     // but work when set via llm_config modification.
     // Step 1: Create agent with letta-free model
@@ -57,6 +61,7 @@ async function getOrCreateAgentForUser(userId: number, username?: string): Promi
       description: `ADHD support agent for Telegram user ${userId.toString()}`,
       model: 'letta/letta-free',
       embedding: 'letta/letta-free',
+      tool_ids: toolIds,
       memory_blocks: [
         {
           label: 'persona',
@@ -67,7 +72,18 @@ async function getOrCreateAgentForUser(userId: number, username?: string): Promi
 - Building habits and routines
 - Managing distractions
 
-Be supportive, understanding, and practical. Keep responses concise and actionable.`,
+Be supportive, understanding, and practical. Keep responses concise and actionable.
+
+You have access to tools for managing tasks and items. Use them to help users:
+- parse_brain_dump: Extract tasks from free-form text
+- break_down_task: Split complex tasks into subtasks
+- save_item: Save tasks, brain dumps, or subtasks
+- update_item: Update status, priority, or content
+- get_open_items: View open tasks and brain dumps`,
+        },
+        {
+          label: 'human',
+          value: `Telegram user ID: ${userId.toString()}`,
         },
       ],
     });

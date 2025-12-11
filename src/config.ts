@@ -70,6 +70,11 @@ export const config = {
 
   // === Database ===
   DB_PATH: optionalEnv('DB_PATH', './data/assistant.db'),
+
+  // === Tool Webhooks ===
+  // URL for Letta's Python tool stubs to call back to our handlers
+  // Use host.docker.internal on Mac/Windows, 172.17.0.1 on Linux
+  TOOL_WEBHOOK_URL: optionalEnv('TOOL_WEBHOOK_URL', 'http://host.docker.internal:3000'),
 } as const;
 
 /**

@@ -9,6 +9,7 @@
  */
 
 import type { ToolCreateParams } from '@letta-ai/letta-client/resources/tools.js';
+import { config } from '../config';
 
 /**
  * Context passed to tool handlers
@@ -147,19 +148,15 @@ export async function dispatchTool(name: string, args: unknown, context: ToolCon
  */
 export function toLettaToolCreate(definition: ToolDefinition): ToolCreateParams {
   // Generate Python source code that Letta can execute
-  // For now, tools will be proxied through a webhook/API call
-  // that dispatches back to our Node.js handlers
+  // Tools are proxied through a webhook to our Bun handlers
+  const webhookUrl = config.TOOL_WEBHOOK_URL;
+
   const sourceCode = `
 def ${definition.name}(**kwargs):
     """${definition.description}"""
-    # This is a placeholder - actual execution happens via webhook
-    # to the Node.js dispatcher
-    import os
     import requests
 
-    webhook_url = os.environ.get('TOOL_WEBHOOK_URL')
-    if not webhook_url:
-        return {"error": "TOOL_WEBHOOK_URL not configured"}
+    webhook_url = "${webhookUrl}"
 
     try:
         response = requests.post(

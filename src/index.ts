@@ -13,6 +13,7 @@ import { config, isWebhookMode } from './config';
 import { healthCheck, simpleHealthCheck } from './health';
 import { initializeLetta } from './letta';
 import { handleUpdate, startPolling } from './bot';
+import { dispatchTool } from './tools';
 import type { Update } from 'telegraf/types';
 
 /**
@@ -80,6 +81,48 @@ async function main(): Promise<void> {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
+      }
+
+      // POST /tools/:name - Letta tool webhook endpoint
+      // Letta's Python tool stubs POST here to execute TypeScript handlers
+      if (path.startsWith('/tools/') && req.method === 'POST') {
+        const toolName = path.slice(7); // "/tools/save_item" → "save_item"
+
+        if (toolName.length === 0) {
+          return new Response(JSON.stringify({ error: 'Tool name required' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        let args: Record<string, unknown>;
+        try {
+          args = (await req.json()) as Record<string, unknown>;
+        } catch {
+          return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Extract user_id from args (passed by Letta agent context)
+        const userId = typeof args['user_id'] === 'number' ? args['user_id'] : 0;
+
+        try {
+          console.log(`Tool webhook: ${toolName}`, { userId, args });
+          const result = await dispatchTool(toolName, args, { userId });
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`Tool webhook error (${toolName}):`, error);
+          return new Response(JSON.stringify({ error: errorMessage }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
       }
 
       // 404 for unknown routes

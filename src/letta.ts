@@ -9,11 +9,25 @@
 
 import { Letta } from '@letta-ai/letta-client';
 import { config } from './config';
+import { getAllLettaToolsCreate } from './tools';
 
 /**
  * Singleton Letta client instance
  */
 let lettaClient: Letta | null = null;
+
+/**
+ * Map of tool name -> Letta tool ID
+ * Populated during initialization
+ */
+const registeredToolIds = new Map<string, string>();
+
+/**
+ * Get all registered tool IDs for attaching to agents
+ */
+export function getRegisteredToolIds(): string[] {
+  return Array.from(registeredToolIds.values());
+}
 
 /**
  * Get or create the Letta client singleton
@@ -87,6 +101,54 @@ export async function ensureProvider(): Promise<string> {
 }
 
 /**
+ * Register all tools with Letta
+ *
+ * Creates tools in Letta if they don't exist, or updates existing ones.
+ * Tool IDs are stored for later attachment to agents.
+ */
+async function registerTools(): Promise<void> {
+  const client = getLettaClient();
+  const toolDefs = getAllLettaToolsCreate();
+
+  console.log(`Registering ${String(toolDefs.length)} tools with Letta...`);
+
+  for (const def of toolDefs) {
+    try {
+      // Extract tool name from the json_schema
+      const toolName =
+        def.json_schema && typeof def.json_schema === 'object' && 'function' in def.json_schema
+          ? ((def.json_schema as { function?: { name?: string } }).function?.name ?? 'unknown')
+          : 'unknown';
+
+      // Check if tool already exists by listing and filtering
+      let existingToolId: string | null = null;
+      for await (const tool of client.tools.list()) {
+        if (tool.name === toolName) {
+          existingToolId = tool.id;
+          break;
+        }
+      }
+
+      if (existingToolId !== null) {
+        console.log(`  Tool '${toolName}' already exists (${existingToolId})`);
+        registeredToolIds.set(toolName, existingToolId);
+      } else {
+        // Create new tool
+        const created = await client.tools.create(def);
+        console.log(`  Created tool '${toolName}' (${created.id})`);
+        registeredToolIds.set(toolName, created.id);
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`  Failed to register tool:`, errorMessage);
+      // Continue with other tools
+    }
+  }
+
+  console.log(`Registered ${String(registeredToolIds.size)} tools`);
+}
+
+/**
  * Get or create the ADHD assistant agent
  *
  * This is a placeholder for M1 implementation.
@@ -122,6 +184,13 @@ export async function initializeLetta(): Promise<void> {
     throw error;
   }
 
-  // Placeholder: agent creation will be added in M1
-  console.log('Letta initialization complete (agent creation deferred to M1)');
+  // Register tools with Letta
+  try {
+    await registerTools();
+  } catch (error) {
+    console.error('Failed to register tools during initialization:', error);
+    // Non-fatal - continue without tools
+  }
+
+  console.log('Letta initialization complete');
 }
