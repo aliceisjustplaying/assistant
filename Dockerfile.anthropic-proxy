@@ -1,10 +1,10 @@
-FROM rust:1.75 as builder
+FROM rust:latest as builder
 WORKDIR /app
 # Clone directly - no local context needed
 RUN git clone https://github.com/orual/anthropic-proxy.git .
 RUN cargo build --release
 
-FROM debian:bookworm-slim
+FROM debian:latest
 RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/anthropic-proxy /usr/local/bin/
 EXPOSE 4001
