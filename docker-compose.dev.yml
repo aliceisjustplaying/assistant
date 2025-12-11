@@ -1,0 +1,33 @@
+version: '3.8'
+
+# Development overrides for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# This config:
+# - Removes the app container (run locally with bun)
+# - Exposes all service ports to localhost for local development
+# - Mounts local volumes for hot reload where applicable
+
+networks:
+  assistant-net:
+    driver: bridge
+
+services:
+  anthropic-proxy:
+    ports:
+      - "4001:4001"
+
+  letta:
+    ports:
+      - "8283:8283"
+    # Optional: mount local config if needed for development
+    # volumes:
+    #   - ./letta-config:/root/.letta
+
+  # Remove app service in dev - run locally with: bun --hot ./src/index.ts
+  app:
+    profiles:
+      - donotstart
+
+volumes:
+  letta-data:
