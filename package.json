@@ -1,0 +1,14 @@
+{
+  "name": "assistant",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript/native-preview": "^7.0.0-dev.20251211.1"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.54",
+    "ai": "^5.0.110"
+  }
+}
