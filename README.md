@@ -196,17 +196,27 @@ bun test --watch
 
 ```
 ├── src/
-│   ├── config.ts        # Environment configuration
-│   ├── health.ts        # Health check endpoints
-│   ├── letta.ts         # Letta client bootstrap
-│   ├── index.ts         # Main server (M1)
-│   ├── bot.ts           # Telegram bot (M1)
-│   ├── auth-adapter.ts  # Header translation middleware
-│   ├── db/              # Database schema (M2)
-│   └── tools/           # Agent tools (M2+)
+│   ├── index.ts           # Main server entry point
+│   ├── bot.ts             # Telegram bot handlers
+│   ├── config.ts          # Environment configuration
+│   ├── health.ts          # Health check endpoints
+│   ├── letta.ts           # Letta client bootstrap
+│   ├── auth-adapter.ts    # Header translation middleware
+│   ├── db/
+│   │   ├── index.ts       # Database initialization
+│   │   ├── schema.ts      # Drizzle ORM schema
+│   │   └── migrations/    # SQL migrations
+│   └── tools/
+│       ├── index.ts       # Barrel exports
+│       ├── dispatcher.ts  # Tool registry and Letta integration
+│       ├── capture.ts     # parse_brain_dump tool
+│       ├── breakdown.ts   # break_down_task tool
+│       ├── items.ts       # save_item, update_item tools
+│       └── context.ts     # get_open_items tool
 ├── scripts/
 │   └── setup-letta-provider.ts  # Setup verification
-├── litellm-config.yaml  # LiteLLM model configuration
+├── drizzle.config.ts      # Drizzle Kit configuration
+├── litellm-config.yaml    # LiteLLM model configuration
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
 ├── Dockerfile.anthropic-proxy
@@ -217,7 +227,7 @@ bun test --watch
 
 - [x] **M0**: Infrastructure (Docker, config, health, Letta client)
 - [x] **M1**: E2E Chat (Telegram bot, basic message flow)
-- [ ] **M2**: Tools + Items (database, capture, breakdown)
+- [x] **M2**: Tools + Items (database, capture, breakdown)
 - [ ] **M3**: Tone + Detection (overwhelm, self-bullying)
 - [ ] **M4**: Tiny Wins (win tracking)
 - [ ] **M5**: Threading (focus, deviations)
