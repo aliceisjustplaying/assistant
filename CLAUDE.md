@@ -108,6 +108,35 @@ For example: `bd create --help` shows `--parent`, `--deps`, `--assignee`, etc.
 
 ---
 
+## Claude Model
+
+**Always use Claude Opus 4.5** for this project:
+- Model ID: `claude-opus-4-5-20251101`
+- Letta handle: `openai/claude-opus-4-5-20251101` (via LiteLLM proxy)
+
+Do NOT use other Claude models (sonnet, haiku, etc.) unless explicitly requested.
+
+### Letta Agent Creation Workaround
+
+Due to a Letta bug with BYOK model handles, agents must be created in two steps:
+
+1. Create agent with `letta/letta-free` model
+2. Update agent's `llm_config` to use Claude:
+   ```typescript
+   await client.agents.update(agentId, {
+     llm_config: {
+       handle: 'openai/claude-opus-4-5-20251101',
+       model: 'claude-opus-4-5-20251101',
+       model_endpoint_type: 'openai',
+       model_endpoint: 'http://litellm:4000',
+       context_window: 200000,
+       temperature: 0.7,
+     },
+   });
+   ```
+
+---
+
 ## Code Quality (MANDATORY)
 
 **CRITICAL**: All code changes MUST pass these checks before completion:

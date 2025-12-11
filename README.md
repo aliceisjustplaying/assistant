@@ -5,11 +5,23 @@ A Telegram bot that helps with ADHD task management, brain dumps, and gentle acc
 ## Architecture
 
 ```
-Telegram → Bun Adapter → Letta Agent → Anthropic (via proxy)
+Telegram Bot (Bun)
+       ↓
+Letta (port 8283) - AI agent framework
+       ↓ OpenAI-compatible API
+LiteLLM (port 4000) - API translation layer
+       ↓ Anthropic API format
+auth-adapter (port 4002) - Header translation
+       ↓
+anthropic-proxy (port 4001) - OAuth session management
+       ↓
+Anthropic API (Claude Opus 4.5)
 ```
 
-- **Bun**: Runtime and HTTP server
+- **Bun**: Runtime and HTTP server for Telegram bot
 - **Letta**: AI agent framework with persistent memory
+- **LiteLLM**: Translates OpenAI-compatible requests to Anthropic format
+- **auth-adapter**: Middleware for header translation (Bearer → x-api-key)
 - **anthropic-proxy**: OAuth proxy for Anthropic API access
 - **SQLite**: Local storage for items, wins, and context
 
@@ -46,8 +58,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
 This starts:
-- `anthropic-proxy` on port 4001
-- `letta` on port 8283
+- `anthropic-proxy` on port 4001 - OAuth proxy for Anthropic API
+- `auth-adapter` on port 4002 - Header translation middleware
+- `litellm` on port 4000 - OpenAI-compatible API proxy
+- `letta` on port 8283 - AI agent framework
 
 The dev override (`docker-compose.dev.yml`) excludes the app service so you can run it locally.
 
@@ -65,15 +79,15 @@ The anthropic-proxy requires OAuth setup for Anthropic API access:
    ANTHROPIC_PROXY_SESSION_ID=your_session_id_here
    ```
 
-### 5. Configure Letta provider
+### 5. Verify Letta setup
 
-Add the anthropic-proxy as a custom LLM provider in Letta:
+Verify that Letta can access Claude models via LiteLLM:
 
 ```bash
 bun run setup:letta
 ```
 
-This registers the proxy with Letta so it can use Claude models.
+This checks that the proxy chain is working and Claude models are available.
 
 ### 6. Run the app
 
@@ -182,13 +196,17 @@ bun test --watch
 
 ```
 ├── src/
-│   ├── config.ts      # Environment configuration
-│   ├── health.ts      # Health check endpoints
-│   ├── letta.ts       # Letta client bootstrap
-│   ├── index.ts       # Main server (M1)
-│   ├── bot.ts         # Telegram bot (M1)
-│   ├── db/            # Database schema (M2)
-│   └── tools/         # Agent tools (M2+)
+│   ├── config.ts        # Environment configuration
+│   ├── health.ts        # Health check endpoints
+│   ├── letta.ts         # Letta client bootstrap
+│   ├── index.ts         # Main server (M1)
+│   ├── bot.ts           # Telegram bot (M1)
+│   ├── auth-adapter.ts  # Header translation middleware
+│   ├── db/              # Database schema (M2)
+│   └── tools/           # Agent tools (M2+)
+├── scripts/
+│   └── setup-letta-provider.ts  # Setup verification
+├── litellm-config.yaml  # LiteLLM model configuration
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
 ├── Dockerfile.anthropic-proxy
@@ -228,6 +246,13 @@ docker compose logs letta
 1. Verify the proxy is running: `curl http://localhost:4001/health`
 2. Check if OAuth is complete (session ID should be set)
 3. Check logs: `docker compose logs anthropic-proxy`
+
+### LiteLLM not routing to Claude
+
+1. Verify LiteLLM is running: `curl http://localhost:4000/health`
+2. Check available models: `curl http://localhost:4000/models`
+3. Test direct call: `curl -X POST http://localhost:4000/chat/completions -H "Content-Type: application/json" -d '{"model":"claude-opus-4-5-20251101","messages":[{"role":"user","content":"Hi"}],"max_tokens":10}'`
+4. Check logs: `docker compose logs litellm`
 
 ### Can't connect to Telegram
 
