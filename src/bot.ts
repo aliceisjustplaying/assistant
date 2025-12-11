@@ -49,17 +49,14 @@ async function getOrCreateAgentForUser(userId: number, username?: string): Promi
     const usernameOrUnknown = username ?? 'unknown';
     console.log(`Creating new agent for user ${userId.toString()} (${usernameOrUnknown})`);
 
-    // Create agent with basic configuration
-    // For M1, we'll use a simple configuration. Later milestones will customize this.
-    // Note: The model string should be in the format "provider/model-name"
-    // The Letta server should be configured with the anthropic-proxy as a provider
+    // Workaround for Letta bug: openai-proxy/ handles are rejected during creation
+    // but work when set via llm_config modification.
+    // Step 1: Create agent with letta-free model
     const agentState = await client.agents.create({
       name: `user-${userId.toString()}-${usernameOrUnknown}`,
       description: `ADHD support agent for Telegram user ${userId.toString()}`,
-      // Using Claude Opus 4.5 via claude-proxy provider
-      model: 'claude-proxy/claude-opus-4-5-20251101',
-      embedding: 'openai/text-embedding-ada-002',
-      // Memory blocks with system prompt for ADHD support
+      model: 'letta/letta-free',
+      embedding: 'letta/letta-free',
       memory_blocks: [
         {
           label: 'persona',
@@ -75,7 +72,21 @@ Be supportive, understanding, and practical. Keep responses concise and actionab
       ],
     });
 
-    console.log(`Created agent ${agentState.id} for user ${userId.toString()}`);
+    console.log(`Created agent ${agentState.id} with letta-free, modifying to use Claude...`);
+
+    // Step 2: Update agent to use Claude Opus 4.5 via LiteLLM proxy
+    await client.agents.update(agentState.id, {
+      llm_config: {
+        handle: 'openai/claude-opus-4-5-20251101',
+        model: 'claude-opus-4-5-20251101',
+        model_endpoint_type: 'openai',
+        model_endpoint: 'http://litellm:4000',
+        context_window: 200000,
+        temperature: 0.7,
+      },
+    });
+
+    console.log(`Agent ${agentState.id} configured with Claude Opus 4.5`);
 
     // Store the mapping
     userAgentMap.set(userId, agentState.id);
