@@ -1,105 +1,107 @@
 #!/usr/bin/env bun
 /**
- * Setup script to add anthropic-proxy as a custom LLM provider in Letta
+ * Verification script to check Letta + LiteLLM + anthropic-proxy setup
  *
- * This configures Letta to use the anthropic-proxy service, which provides
- * an OpenAI-compatible API that proxies to Anthropic's Claude models.
+ * This verifies that:
+ * 1. Letta is running and healthy
+ * 2. Claude models are available via LiteLLM (configured via OPENAI_API_BASE)
+ * 3. The proxy chain is working
  *
  * Run: bun scripts/setup-letta-provider.ts
  */
 
 const LETTA_BASE_URL = process.env['LETTA_BASE_URL'] ?? 'http://localhost:8283';
-const SESSION_ID = process.env['ANTHROPIC_PROXY_SESSION_ID'] ?? '';
 
-// Validate session ID is set
-if (SESSION_ID === '') {
-  console.error('Error: ANTHROPIC_PROXY_SESSION_ID is not set in .env');
-  console.error('Complete the OAuth flow first: http://localhost:4001/auth/device');
-  process.exit(1);
+interface Model {
+  handle: string;
+  provider_name: string;
+  model_endpoint?: string;
 }
 
-// The anthropic-proxy uses the session ID as the x-api-key header
-// Letta will pass this as Authorization: Bearer <api_key> which the proxy accepts
-const PROVIDER_CONFIG = {
-  name: 'claude-proxy', // Using different name to avoid Letta soft-delete constraint issues
-  provider_type: 'openai', // OpenAI-compatible API
-  api_key: SESSION_ID, // Session ID is used as the API key
-  base_url: 'http://anthropic-proxy:4001/v1', // Docker internal network
-};
-
-interface Provider {
-  id: string;
-  name: string;
-  api_key?: string;
-}
-
-async function getExistingProvider(): Promise<Provider | null> {
-  try {
-    const response = await fetch(`${LETTA_BASE_URL}/v1/providers/`);
-    if (!response.ok) {
-      return null;
-    }
-    const providers = (await response.json()) as Provider[];
-    return providers.find((p) => p.name === PROVIDER_CONFIG.name) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function updateProvider(providerId: string): Promise<boolean> {
-  console.log(`Updating provider ${providerId} with new API key...`);
-  const response = await fetch(`${LETTA_BASE_URL}/v1/providers/${providerId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_key: SESSION_ID }),
-  });
+async function listModels(): Promise<Model[]> {
+  const response = await fetch(`${LETTA_BASE_URL}/v1/models/`);
   if (!response.ok) {
-    const errorText = await response.text();
-    console.warn(`Warning: Could not update provider: ${errorText}`);
+    throw new Error(`Failed to fetch models: ${response.status}`);
+  }
+  return (await response.json()) as Model[];
+}
+
+async function testAgentCreation(): Promise<boolean> {
+  // Create a test agent with letta-free, then update to Claude
+  console.log('Testing agent creation workflow...');
+
+  // Step 1: Create agent with letta-free
+  const createResponse = await fetch(`${LETTA_BASE_URL}/v1/agents/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: `test-setup-${Date.now().toString()}`,
+      model: 'letta/letta-free',
+      embedding: 'letta/letta-free',
+      memory_blocks: [{ label: 'persona', value: 'Test agent' }],
+    }),
+  });
+
+  if (!createResponse.ok) {
+    console.error('  Failed to create test agent:', await createResponse.text());
     return false;
   }
+
+  const agent = (await createResponse.json()) as { id: string };
+  console.log(`  Created test agent: ${agent.id}`);
+
+  // Step 2: Update to Claude
+  const updateResponse = await fetch(`${LETTA_BASE_URL}/v1/agents/${agent.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      llm_config: {
+        handle: 'openai/claude-opus-4-5-20251101',
+        model: 'claude-opus-4-5-20251101',
+        model_endpoint_type: 'openai',
+        model_endpoint: 'http://litellm:4000',
+        context_window: 200000,
+        temperature: 0.7,
+      },
+    }),
+  });
+
+  if (!updateResponse.ok) {
+    console.error('  Failed to update agent to Claude:', await updateResponse.text());
+    // Clean up
+    await fetch(`${LETTA_BASE_URL}/v1/agents/${agent.id}`, { method: 'DELETE' });
+    return false;
+  }
+
+  console.log('  Updated agent to use Claude Opus 4.5');
+
+  // Step 3: Send test message
+  const messageResponse = await fetch(`${LETTA_BASE_URL}/v1/agents/${agent.id}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: 'Say "Hello from Claude!" and nothing else.' }],
+    }),
+  });
+
+  if (!messageResponse.ok) {
+    console.error('  Failed to send test message:', await messageResponse.text());
+    // Clean up
+    await fetch(`${LETTA_BASE_URL}/v1/agents/${agent.id}`, { method: 'DELETE' });
+    return false;
+  }
+
+  console.log('  Test message sent successfully');
+
+  // Clean up
+  await fetch(`${LETTA_BASE_URL}/v1/agents/${agent.id}`, { method: 'DELETE' });
+  console.log('  Test agent cleaned up');
+
   return true;
 }
 
-async function createProvider(): Promise<void> {
-  console.log('Adding anthropic-proxy provider to Letta...');
-  console.log(`  Letta URL: ${LETTA_BASE_URL}`);
-  console.log(`  Provider: ${PROVIDER_CONFIG.name}`);
-  console.log(`  Type: ${PROVIDER_CONFIG.provider_type}`);
-  console.log(`  Base URL: ${PROVIDER_CONFIG.base_url}`);
-
-  const response = await fetch(`${LETTA_BASE_URL}/v1/providers/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(PROVIDER_CONFIG),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to create provider: ${response.status} ${errorText}`);
-  }
-
-  const result = (await response.json()) as { id: string; name: string };
-  console.log(`\nProvider created successfully!`);
-  console.log(`  ID: ${result.id}`);
-  console.log(`  Name: ${result.name}`);
-}
-
-async function listModels(): Promise<void> {
-  console.log('\nAvailable models:');
-  const response = await fetch(`${LETTA_BASE_URL}/v1/models/`);
-  if (!response.ok) {
-    console.log('  (Could not fetch models)');
-    return;
-  }
-  const models = (await response.json()) as Array<{ handle: string; provider_name: string }>;
-  for (const model of models) {
-    console.log(`  - ${model.handle} (${model.provider_name})`);
-  }
-}
-
 async function main(): Promise<void> {
-  console.log('=== Letta Provider Setup ===\n');
+  console.log('=== Letta Setup Verification ===\n');
 
   // Check if Letta is running
   try {
@@ -108,36 +110,41 @@ async function main(): Promise<void> {
       throw new Error('Letta health check failed');
     }
     console.log('Letta is running.\n');
-  } catch (error) {
+  } catch {
     console.error('Error: Letta is not accessible at', LETTA_BASE_URL);
     console.error('Make sure to run: docker compose up -d');
     process.exit(1);
   }
 
-  // Check if provider already exists
-  const existing = await getExistingProvider();
-  if (existing !== null) {
-    console.log(`Provider "anthropic-proxy" already exists (ID: ${existing.id})`);
-    const updated = await updateProvider(existing.id);
-    if (updated) {
-      console.log('Provider updated successfully with current session ID.');
-      await listModels();
-      console.log('\nSetup complete! You can now run: bun run dev');
-      return;
-    }
-    console.log('Update failed, provider may already have correct configuration.');
-    await listModels();
-    return;
+  // List available models
+  console.log('Available models:');
+  const models = await listModels();
+  const claudeModels = models.filter((m) => m.handle.includes('claude'));
+
+  for (const model of models) {
+    const marker = model.handle.includes('claude') ? ' <-- Claude via LiteLLM' : '';
+    console.log(`  - ${model.handle} (${model.provider_name})${marker}`);
   }
 
-  // Create the provider
-  await createProvider();
-  await listModels();
+  if (claudeModels.length === 0) {
+    console.error('\nNo Claude models found. Check OPENAI_API_BASE and LiteLLM configuration.');
+    process.exit(1);
+  }
 
-  console.log('\nSetup complete! You can now run: bun run dev');
+  console.log(`\nFound ${claudeModels.length.toString()} Claude model(s) via LiteLLM.\n`);
+
+  // Test agent creation workflow
+  const success = await testAgentCreation();
+
+  if (success) {
+    console.log('\nSetup verified! You can now run: bun run dev');
+  } else {
+    console.error('\nSetup verification failed. Check the logs above.');
+    process.exit(1);
+  }
 }
 
 main().catch((error: unknown) => {
-  console.error('Setup failed:', error);
+  console.error('Verification failed:', error);
   process.exit(1);
 });
