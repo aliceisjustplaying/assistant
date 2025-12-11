@@ -3,9 +3,27 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsgo --noEmit",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/",
+    "test": "bun test",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun test",
+    "fix": "bun run lint:fix && bun run format"
+  },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/bun": "latest",
-    "@typescript/native-preview": "^7.0.0-dev.20251211.1"
+    "@typescript/native-preview": "^7.0.0-dev.20251211.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.7.4",
+    "typescript-eslint": "^8.49.0"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.54",

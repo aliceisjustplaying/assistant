@@ -10,7 +10,7 @@
  */
 function requireEnv(name: string): string {
   const value = process.env[name];
-  if (!value) {
+  if (value === undefined || value === '') {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
@@ -20,7 +20,8 @@ function requireEnv(name: string): string {
  * Get an optional environment variable with a default value
  */
 function optionalEnv(name: string, defaultValue: string): string {
-  return process.env[name] || defaultValue;
+  const value = process.env[name];
+  return value !== undefined && value !== '' ? value : defaultValue;
 }
 
 /**
@@ -28,7 +29,9 @@ function optionalEnv(name: string, defaultValue: string): string {
  */
 function numberEnv(name: string, defaultValue: number): number {
   const value = process.env[name];
-  if (!value) return defaultValue;
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
   const parsed = Number(value);
   if (isNaN(parsed)) {
     throw new Error(`Environment variable ${name} must be a number, got: ${value}`);
@@ -44,26 +47,26 @@ function numberEnv(name: string, defaultValue: number): number {
  */
 export const config = {
   // === Server ===
-  PORT: numberEnv("PORT", 3000),
+  PORT: numberEnv('PORT', 3000),
 
   // === Letta ===
-  LETTA_BASE_URL: requireEnv("LETTA_BASE_URL"),
+  LETTA_BASE_URL: requireEnv('LETTA_BASE_URL'),
 
   // === Telegram ===
-  TELEGRAM_BOT_TOKEN: requireEnv("TELEGRAM_BOT_TOKEN"),
-  TELEGRAM_WEBHOOK_URL: optionalEnv("TELEGRAM_WEBHOOK_URL", ""),
-  TELEGRAM_WEBHOOK_SECRET_TOKEN: optionalEnv("TELEGRAM_WEBHOOK_SECRET_TOKEN", ""),
+  TELEGRAM_BOT_TOKEN: requireEnv('TELEGRAM_BOT_TOKEN'),
+  TELEGRAM_WEBHOOK_URL: optionalEnv('TELEGRAM_WEBHOOK_URL', ''),
+  TELEGRAM_WEBHOOK_SECRET_TOKEN: optionalEnv('TELEGRAM_WEBHOOK_SECRET_TOKEN', ''),
 
   // === Anthropic Proxy ===
-  ANTHROPIC_PROXY_URL: requireEnv("ANTHROPIC_PROXY_URL"),
-  ANTHROPIC_PROXY_SESSION_SECRET: requireEnv("ANTHROPIC_PROXY_SESSION_SECRET"),
-  ANTHROPIC_PROXY_SESSION_ID: optionalEnv("ANTHROPIC_PROXY_SESSION_ID", ""),
+  ANTHROPIC_PROXY_URL: requireEnv('ANTHROPIC_PROXY_URL'),
+  ANTHROPIC_PROXY_SESSION_SECRET: requireEnv('ANTHROPIC_PROXY_SESSION_SECRET'),
+  ANTHROPIC_PROXY_SESSION_ID: optionalEnv('ANTHROPIC_PROXY_SESSION_ID', ''),
 
   // === OpenAI (embeddings only) ===
-  OPENAI_API_KEY: requireEnv("OPENAI_API_KEY"),
+  OPENAI_API_KEY: requireEnv('OPENAI_API_KEY'),
 
   // === Database ===
-  DB_PATH: optionalEnv("DB_PATH", "./data/assistant.db"),
+  DB_PATH: optionalEnv('DB_PATH', './data/assistant.db'),
 } as const;
 
 /**
@@ -74,13 +77,13 @@ export const config = {
  */
 export function validateConfig(): void {
   // Webhook URL and secret token must both be present or both be empty
-  const hasWebhookUrl = config.TELEGRAM_WEBHOOK_URL !== "";
-  const hasWebhookSecret = config.TELEGRAM_WEBHOOK_SECRET_TOKEN !== "";
+  const hasWebhookUrl = config.TELEGRAM_WEBHOOK_URL !== '';
+  const hasWebhookSecret = config.TELEGRAM_WEBHOOK_SECRET_TOKEN !== '';
 
   if (hasWebhookUrl !== hasWebhookSecret) {
     throw new Error(
-      "TELEGRAM_WEBHOOK_URL and TELEGRAM_WEBHOOK_SECRET_TOKEN must both be set or both be empty. " +
-      "If both are empty, the bot will run in polling mode (dev only)."
+      'TELEGRAM_WEBHOOK_URL and TELEGRAM_WEBHOOK_SECRET_TOKEN must both be set or both be empty. ' +
+        'If both are empty, the bot will run in polling mode (dev only).'
     );
   }
 
@@ -108,14 +111,13 @@ export function validateConfig(): void {
   // Warn if session ID is missing (needed for Anthropic proxy to work)
   if (!config.ANTHROPIC_PROXY_SESSION_ID) {
     console.warn(
-      "⚠️  ANTHROPIC_PROXY_SESSION_ID is not set. " +
-      "The Anthropic proxy will not work until OAuth flow is completed."
+      '⚠️  ANTHROPIC_PROXY_SESSION_ID is not set. ' + 'The Anthropic proxy will not work until OAuth flow is completed.'
     );
   }
 
   // Port validation
   if (config.PORT < 1 || config.PORT > 65535) {
-    throw new Error(`PORT must be between 1 and 65535, got: ${config.PORT}`);
+    throw new Error(`PORT must be between 1 and 65535, got: ${config.PORT.toString()}`);
   }
 }
 
@@ -123,12 +125,12 @@ export function validateConfig(): void {
  * Determine if the bot should run in webhook mode or polling mode
  */
 export function isWebhookMode(): boolean {
-  return config.TELEGRAM_WEBHOOK_URL !== "" && config.TELEGRAM_WEBHOOK_SECRET_TOKEN !== "";
+  return config.TELEGRAM_WEBHOOK_URL !== '' && config.TELEGRAM_WEBHOOK_SECRET_TOKEN !== '';
 }
 
 /**
  * Determine if the Anthropic proxy is configured and ready
  */
 export function isAnthropicProxyReady(): boolean {
-  return config.ANTHROPIC_PROXY_SESSION_ID !== "";
+  return config.ANTHROPIC_PROXY_SESSION_ID !== '';
 }

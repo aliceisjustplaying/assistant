@@ -7,8 +7,8 @@
  * - Agent creation (placeholder for M1)
  */
 
-import { Letta } from "@letta-ai/letta-client";
-import { config } from "./config";
+import { Letta } from '@letta-ai/letta-client';
+import { config } from './config';
 
 /**
  * Singleton Letta client instance
@@ -19,11 +19,9 @@ let lettaClient: Letta | null = null;
  * Get or create the Letta client singleton
  */
 export function getLettaClient(): Letta {
-  if (!lettaClient) {
-    lettaClient = new Letta({
-      baseUrl: config.LETTA_BASE_URL,
-    });
-  }
+  lettaClient ??= new Letta({
+    baseURL: config.LETTA_BASE_URL,
+  });
   return lettaClient;
 }
 
@@ -49,33 +47,36 @@ export async function ensureProvider(): Promise<string> {
   const client = getLettaClient();
 
   try {
-    console.log("Verifying Letta connectivity...");
+    console.log('Verifying Letta connectivity...');
 
     // List available models to verify connectivity
-    const models = await client.models.list();
-    console.log(`Letta is accessible. Found ${models.llm_models?.length || 0} LLM models and ${models.embedding_models?.length || 0} embedding models.`);
+    const llmModels = await client.models.list();
+    const embeddingModels = await client.models.embeddings.list();
+    console.log(
+      `Letta is accessible. Found ${llmModels.length.toString()} LLM models and ${embeddingModels.length.toString()} embedding models.`
+    );
 
     // Log available Anthropic models
-    const anthropicModels = models.llm_models?.filter((m: any) =>
-      m.provider_type === "anthropic" || m.provider_name?.includes("anthropic")
-    ) || [];
+    const anthropicModels = llmModels.filter(
+      (m) => m.provider_type === 'anthropic' || (m.provider_name?.includes('anthropic') ?? false)
+    );
 
     if (anthropicModels.length > 0) {
-      console.log(`Found ${anthropicModels.length} Anthropic model(s):`);
-      anthropicModels.forEach((m: any) => {
-        console.log(`  - ${m.handle || m.name}`);
+      console.log(`Found ${anthropicModels.length.toString()} Anthropic model(s):`);
+      anthropicModels.forEach((m) => {
+        console.log(`  - ${m.handle ?? m.name}`);
       });
     } else {
       console.warn(
-        "⚠️  No Anthropic models found. " +
-        "Make sure the anthropic-proxy is configured as a provider in Letta server. " +
-        "This may need to be done via Letta's admin interface or configuration."
+        '⚠️  No Anthropic models found. ' +
+          'Make sure the anthropic-proxy is configured as a provider in Letta server. ' +
+          "This may need to be done via Letta's admin interface or configuration."
       );
     }
 
-    return "Letta connectivity verified";
-  } catch (error: any) {
-    console.error("Failed to verify Letta connectivity:", error);
+    return 'Letta connectivity verified';
+  } catch (error: unknown) {
+    console.error('Failed to verify Letta connectivity:', error);
     throw error;
   }
 }
@@ -88,10 +89,10 @@ export async function ensureProvider(): Promise<string> {
  *
  * @returns Agent ID once implemented, null for now
  */
-export async function getOrCreateAgent(): Promise<string | null> {
-  console.log("getOrCreateAgent() called - placeholder for M1 implementation");
-  console.log("Agent creation will be implemented in milestone M1");
-  return null;
+export function getOrCreateAgent(): Promise<string | null> {
+  console.log('getOrCreateAgent() called - placeholder for M1 implementation');
+  console.log('Agent creation will be implemented in milestone M1');
+  return Promise.resolve(null);
 }
 
 /**
@@ -102,20 +103,20 @@ export async function getOrCreateAgent(): Promise<string | null> {
  * - Eventually will create/get the agent (M1)
  */
 export async function initializeLetta(): Promise<void> {
-  console.log("Initializing Letta...");
+  console.log('Initializing Letta...');
 
   // Get client (creates singleton)
-  const client = getLettaClient();
+  getLettaClient();
   console.log(`Letta client initialized (base URL: ${config.LETTA_BASE_URL})`);
 
   // Ensure provider exists
   try {
     await ensureProvider();
   } catch (error) {
-    console.error("Failed to ensure provider during initialization:", error);
+    console.error('Failed to ensure provider during initialization:', error);
     throw error;
   }
 
   // Placeholder: agent creation will be added in M1
-  console.log("Letta initialization complete (agent creation deferred to M1)");
+  console.log('Letta initialization complete (agent creation deferred to M1)');
 }

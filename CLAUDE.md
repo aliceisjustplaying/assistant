@@ -108,6 +108,53 @@ For example: `bd create --help` shows `--parent`, `--deps`, `--assignee`, etc.
 
 ---
 
+## Code Quality (MANDATORY)
+
+**CRITICAL**: All code changes MUST pass these checks before completion:
+
+```bash
+bun run check  # Runs all checks: typecheck, lint, format, test
+```
+
+### Individual Commands
+
+```bash
+bun run typecheck    # TypeScript strict checking with tsgo
+bun run lint         # ESLint with strict rules
+bun run format:check # Prettier format verification
+bun test             # Run all tests
+```
+
+### Auto-fix Commands
+
+```bash
+bun run fix          # Auto-fix lint and format issues
+bun run lint:fix     # Fix ESLint issues only
+bun run format       # Fix Prettier issues only
+```
+
+### Subagent Handoff Protocol
+
+**Before completing ANY task**, subagents MUST:
+
+1. Run `bun run check` and ensure ALL checks pass
+2. Fix any errors found (use `bun run fix` for auto-fixable issues)
+3. Re-run `bun run check` to verify fixes
+4. Only mark task complete when all checks pass
+
+**If checks fail and cannot be fixed:**
+- Document the specific errors in the task completion message
+- Do NOT mark task as complete
+- Escalate to orchestrator for resolution
+
+### Configuration Files
+
+- `tsconfig.json` - Strict TypeScript (all strict flags enabled)
+- `eslint.config.js` - ESLint flat config with typescript-eslint strict
+- `.prettierrc` - Prettier (120 chars, semicolons, single quotes)
+
+---
+
 ## Bun Runtime
 
 Default to using Bun instead of Node.js.

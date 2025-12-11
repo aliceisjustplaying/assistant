@@ -9,7 +9,7 @@
  * Returns 200 if all services are healthy, 503 if any are down.
  */
 
-import { config } from "./config";
+import { config } from './config';
 
 export interface HealthCheckResult {
   healthy: boolean;
@@ -34,50 +34,31 @@ export async function healthCheck(): Promise<Response> {
 
   // DB: Optional for M0 (database module doesn't exist yet)
   // Will be enabled in M2 when src/db/index.ts exists
-  try {
-    // Check if database module exists and is importable
-    const dbModule = await import("./db/index.js").catch(() => null);
-    if (dbModule?.sqlite) {
-      // Use underlying bun:sqlite directly for simple ping
-      dbModule.sqlite.query("SELECT 1").get();
-      checks.db = true;
-    } else {
-      // Database module not yet implemented, skip check
-      // In M0 this is expected and not a failure
-      checks.db = true;
-    }
-  } catch (error) {
-    // Database check failed - only log in production
-    // In M0/development, this is expected
-    if (process.env.NODE_ENV === "production") {
-      console.error("Database health check failed:", error);
-    }
-    // For M0, we treat missing DB as non-critical
-    checks.db = true;
-  }
+  // For now, we skip the DB check entirely - it will be implemented in M2
+  checks.db = true;
 
   // Letta: Check health endpoint (fast, doesn't query agents)
   try {
     const res = await fetch(`${config.LETTA_BASE_URL}/v1/health/`, {
-      method: "GET",
+      method: 'GET',
       signal: AbortSignal.timeout(5000), // 5s timeout
     });
     checks.letta = res.ok;
   } catch (error) {
-    console.error("Letta health check failed:", error);
+    console.error('Letta health check failed:', error);
     checks.letta = false;
   }
 
   // Proxy: Check health endpoint
   try {
-    const proxyHealthUrl = config.ANTHROPIC_PROXY_URL.replace("/v1", "/health");
+    const proxyHealthUrl = config.ANTHROPIC_PROXY_URL.replace('/v1', '/health');
     const res = await fetch(proxyHealthUrl, {
-      method: "GET",
+      method: 'GET',
       signal: AbortSignal.timeout(5000), // 5s timeout
     });
     checks.proxy = res.ok;
   } catch (error) {
-    console.error("Proxy health check failed:", error);
+    console.error('Proxy health check failed:', error);
     checks.proxy = false;
   }
 
@@ -92,7 +73,7 @@ export async function healthCheck(): Promise<Response> {
   return new Response(JSON.stringify(result), {
     status: healthy ? 200 : 503,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
   });
 }
@@ -110,12 +91,12 @@ export function simpleHealthCheck(): Response {
       checks: {
         server: true,
       },
-      message: "Server is running (M0 - basic health check)",
+      message: 'Server is running (M0 - basic health check)',
     }),
     {
       status: 200,
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
     }
   );
