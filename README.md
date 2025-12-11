@@ -55,10 +55,12 @@ The dev override (`docker-compose.dev.yml`) excludes the app service so you can 
 
 The anthropic-proxy requires OAuth setup for Anthropic API access:
 
-1. Open http://localhost:4001 in your browser
-2. Complete the Anthropic OAuth flow
-3. Copy the session ID from the callback
-4. Add it to your `.env`:
+1. Open http://localhost:4001/auth/device in your browser
+2. Click "Start Authorization" to generate an auth URL
+3. Open the URL and authorize in Claude
+4. Paste the authorization code back into the form
+5. Copy the session ID shown after success
+6. Add it to your `.env`:
    ```
    ANTHROPIC_PROXY_SESSION_ID=your_session_id_here
    ```
@@ -104,11 +106,11 @@ bun --hot src/index.ts
 3. Copy the bot token to `TELEGRAM_BOT_TOKEN` in `.env`
 4. (Optional) Set bot commands via `/setcommands`:
    ```
-   start - Start the bot
-   help - Show help
-   dump - Brain dump mode
-   focus - Set current focus
-   wins - Show recent wins
+start - Start the bot
+help - Show help
+dump - Brain dump mode
+focus - Set current focus
+wins - Show recent wins
    ```
 
 ### Webhook vs Polling
