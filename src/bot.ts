@@ -19,46 +19,51 @@ import { getLettaClient, getRegisteredToolIds } from './letta';
 export const bot = new Telegraf(config.TELEGRAM_BOT_TOKEN);
 
 /**
- * In-memory map of Telegram user ID -> Letta agent ID
- * In production, this would be stored in a database
+ * Single agent ID for the bot (found or created on startup)
  */
-const userAgentMap = new Map<number, string>();
+let agentId: string | null = null;
+
+const AGENT_NAME = 'adhd-support-agent';
 
 /**
- * Get or create a Letta agent for the given Telegram user
+ * Get or create the single ADHD support agent
  *
- * For M1, this is a simple implementation that creates one agent per user.
- * Later milestones will add more sophisticated agent management.
+ * Searches for existing agent by name, creates if not found.
+ * This ensures we reuse the same agent across restarts.
  *
- * @param userId - Telegram user ID
- * @param username - Telegram username (for logging/debugging)
  * @returns Agent ID
  */
-async function getOrCreateAgentForUser(userId: number, username?: string): Promise<string> {
-  // Check if we already have an agent for this user
-  const existingAgentId = userAgentMap.get(userId);
-  if (existingAgentId !== undefined) {
-    console.log(`Using existing agent ${existingAgentId} for user ${userId.toString()}`);
-    return existingAgentId;
+async function getOrCreateAgent(): Promise<string> {
+  if (agentId !== null) {
+    return agentId;
   }
 
-  // Create a new agent for this user
   const client = getLettaClient();
 
   try {
-    const usernameOrUnknown = username ?? 'unknown';
-    console.log(`Creating new agent for user ${userId.toString()} (${usernameOrUnknown})`);
+    // Search for existing agent by name
+    console.log(`Looking for existing agent '${AGENT_NAME}'...`);
+    for await (const agent of client.agents.list()) {
+      if (agent.name === AGENT_NAME) {
+        console.log(`Found existing agent: ${agent.id}`);
+        agentId = agent.id;
+        return agentId;
+      }
+    }
+
+    // No existing agent found, create one
+    console.log(`No existing agent found, creating '${AGENT_NAME}'...`);
 
     // Get registered tool IDs to attach to this agent
     const toolIds = getRegisteredToolIds();
-    console.log(`Attaching ${String(toolIds.length)} tools to new agent`);
+    console.log(`Will attach ${String(toolIds.length)} tools to new agent`);
 
     // Workaround for Letta bug: openai-proxy/ handles are rejected during creation
     // but work when set via llm_config modification.
     // Step 1: Create agent with letta-free model (tools attached separately in step 3)
     const agentState = await client.agents.create({
-      name: `user-${userId.toString()}-${usernameOrUnknown}`,
-      description: `ADHD support agent for Telegram user ${userId.toString()}`,
+      name: AGENT_NAME,
+      description: 'ADHD support agent for task management and gentle accountability',
       model: 'letta/letta-free',
       embedding: 'letta/letta-free',
       memory_blocks: [
@@ -82,7 +87,7 @@ You have access to tools for managing tasks and items. Use them to help users:
         },
         {
           label: 'human',
-          value: `Telegram user ID: ${userId.toString()}`,
+          value: 'A person with ADHD who needs help managing tasks and staying focused.',
         },
       ],
     });
@@ -114,13 +119,11 @@ You have access to tools for managing tasks and items. Use them to help users:
     }
     console.log(`Attached ${String(toolIds.length)} tools to agent`);
 
-    // Store the mapping
-    userAgentMap.set(userId, agentState.id);
-
-    return agentState.id;
+    agentId = agentState.id;
+    return agentId;
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error(`Failed to create agent for user ${userId.toString()}:`, err);
+    console.error('Failed to create agent:', err);
     throw new Error(`Failed to create agent: ${errorMessage}`);
   }
 }
@@ -270,6 +273,31 @@ Just send me a regular message to chat! I'll remember our conversation and help 
 });
 
 /**
+ * Handle /reset command - delete and recreate the agent
+ */
+bot.command('reset', async (ctx: Context) => {
+  try {
+    await ctx.sendChatAction('typing');
+
+    const client = getLettaClient();
+
+    if (agentId !== null) {
+      console.log(`Deleting agent ${agentId}...`);
+      await client.agents.delete(agentId);
+      agentId = null;
+      console.log('Agent deleted');
+    }
+
+    // Create fresh agent
+    const newAgentId = await getOrCreateAgent();
+    await ctx.reply(`Agent reset successfully. New agent ID: ${newAgentId.slice(0, 12)}...`);
+  } catch (err: unknown) {
+    console.error('Error resetting agent:', err);
+    await ctx.reply('Failed to reset agent. Check logs for details.');
+  }
+});
+
+/**
  * Handle text messages
  */
 bot.on('message', async (ctx: Context) => {
@@ -280,15 +308,6 @@ bot.on('message', async (ctx: Context) => {
 
   const messageText = ctx.message.text;
 
-  // Check if ctx.from exists (it should always exist for messages, but TypeScript requires the check)
-  if (!ctx.from) {
-    console.error('Message received without sender information');
-    return;
-  }
-
-  const userId = ctx.from.id;
-  const username = ctx.from.username;
-
   // Skip if it's a command (already handled by command handlers)
   if (messageText.startsWith('/')) {
     return;
@@ -298,11 +317,11 @@ bot.on('message', async (ctx: Context) => {
     // Show typing indicator while processing
     await ctx.sendChatAction('typing');
 
-    // Get or create agent for this user
-    const agentId = await getOrCreateAgentForUser(userId, username);
+    // Get or create the single agent
+    const currentAgentId = await getOrCreateAgent();
 
     // Send message to agent and get response
-    const response = await sendMessageToAgent(agentId, messageText);
+    const response = await sendMessageToAgent(currentAgentId, messageText);
 
     // Reply to user
     await ctx.reply(response);
