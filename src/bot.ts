@@ -378,3 +378,12 @@ export async function startPolling(): Promise<void> {
     throw error;
   }
 }
+
+// Handle Bun hot reload - stop bot before module replacement
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, @typescript-eslint/strict-boolean-expressions -- import.meta.hot is undefined when not in hot mode
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    console.log('Hot reload: stopping bot...');
+    bot.stop('HOT_RELOAD');
+  });
+}
