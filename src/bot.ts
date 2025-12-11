@@ -136,11 +136,48 @@ async function sendMessageToAgent(agentId: string, message: string): Promise<str
   const client = getLettaClient();
 
   try {
+    const msgPreview = message.slice(0, 100) + (message.length > 100 ? '...' : '');
+    console.log(`\n📤 Sending message to agent ${agentId}: "${msgPreview}"`);
+
     // Send message to agent (non-streaming mode for simplicity in M1)
     const response = await client.agents.messages.create(agentId, {
       input: message,
       streaming: false,
     });
+
+    // Log all messages in the response for debugging
+    console.log(`📨 Agent response contains ${String(response.messages.length)} messages:`);
+    for (const msg of response.messages) {
+      const msgType = msg.message_type;
+      if (msgType === 'tool_call_message') {
+        // Tool call - show tool name and args
+        const toolMsg = msg as { tool_call?: { name?: string; arguments?: string } };
+        const toolName = toolMsg.tool_call?.name ?? 'unknown';
+        const toolArgs = toolMsg.tool_call?.arguments ?? '{}';
+        console.log(`   🔧 TOOL CALL: ${toolName}(${toolArgs})`);
+      } else if (msgType === 'tool_return_message') {
+        // Tool return - show result
+        const returnMsg = msg as { tool_return?: string; status?: string };
+        const status = returnMsg.status ?? 'unknown';
+        const result = returnMsg.tool_return ?? '';
+        const truncated = result.length > 200 ? result.slice(0, 200) + '...' : result;
+        console.log(`   ✅ TOOL RETURN (${status}): ${truncated}`);
+      } else if (msgType === 'assistant_message') {
+        // Assistant message - show content preview
+        const assistantMsg = msg as { content?: string | unknown[] };
+        const content = typeof assistantMsg.content === 'string' ? assistantMsg.content : '[complex content]';
+        const truncated = content.length > 100 ? content.slice(0, 100) + '...' : content;
+        console.log(`   💬 ASSISTANT: ${truncated}`);
+      } else if (msgType === 'reasoning_message') {
+        // Reasoning/thinking
+        const reasoningMsg = msg as { reasoning?: string };
+        const reasoning = reasoningMsg.reasoning ?? '';
+        const truncated = reasoning.length > 100 ? reasoning.slice(0, 100) + '...' : reasoning;
+        console.log(`   🧠 REASONING: ${truncated}`);
+      } else {
+        console.log(`   📝 ${String(msgType)}`);
+      }
+    }
 
     // Extract the assistant's response from the messages
     // The response contains an array of messages, we want the assistant's reply

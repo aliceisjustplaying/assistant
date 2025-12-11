@@ -126,13 +126,10 @@ export async function dispatchTool(name: string, args: unknown, context: ToolCon
   }
 
   try {
-    console.log(`Dispatching tool: ${name}`, { args, userId: context.userId });
     const result = await tool.handler(args, context);
-    console.log(`Tool '${name}' executed successfully`);
     return result;
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Tool '${name}' execution failed:`, error);
     throw new Error(`Failed to execute tool '${name}': ${errorMessage}`);
   }
 }

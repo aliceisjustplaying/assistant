@@ -109,15 +109,19 @@ async function main(): Promise<void> {
         const userId = typeof args['user_id'] === 'number' ? args['user_id'] : 0;
 
         try {
-          console.log(`Tool webhook: ${toolName}`, { userId, args });
+          console.log(`\n🔧 TOOL WEBHOOK RECEIVED: ${toolName}`);
+          console.log(`   Args: ${JSON.stringify(args)}`);
           const result = await dispatchTool(toolName, args, { userId });
+          const resultStr = JSON.stringify(result);
+          const truncated = resultStr.length > 300 ? resultStr.slice(0, 300) + '...' : resultStr;
+          console.log(`   Result: ${truncated}`);
           return new Response(JSON.stringify(result), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          console.error(`Tool webhook error (${toolName}):`, error);
+          console.error(`❌ TOOL WEBHOOK ERROR (${toolName}):`, errorMessage);
           return new Response(JSON.stringify({ error: errorMessage }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
