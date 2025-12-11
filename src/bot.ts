@@ -56,8 +56,8 @@ async function getOrCreateAgentForUser(userId: number, username?: string): Promi
     const agentState = await client.agents.create({
       name: `user-${userId.toString()}-${usernameOrUnknown}`,
       description: `ADHD support agent for Telegram user ${userId.toString()}`,
-      // Using Claude Opus 4.5 (should be configured in Letta server)
-      model: 'anthropic/claude-opus-4-5-20251101',
+      // Using Claude Opus 4.5 via claude-proxy provider
+      model: 'claude-proxy/claude-opus-4-5-20251101',
       embedding: 'openai/text-embedding-ada-002',
       // Memory blocks with system prompt for ADHD support
       memory_blocks: [

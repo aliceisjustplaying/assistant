@@ -65,16 +65,26 @@ The anthropic-proxy requires OAuth setup for Anthropic API access:
    ANTHROPIC_PROXY_SESSION_ID=your_session_id_here
    ```
 
-### 5. Run the app
+### 5. Configure Letta provider
+
+Add the anthropic-proxy as a custom LLM provider in Letta:
 
 ```bash
-bun run src/index.ts
+bun run setup:letta
 ```
 
-Or with hot reload:
+This registers the proxy with Letta so it can use Claude models.
+
+### 6. Run the app
 
 ```bash
-bun --hot src/index.ts
+bun run dev
+```
+
+Or without hot reload:
+
+```bash
+bun run start
 ```
 
 ## Environment Variables
@@ -188,7 +198,7 @@ bun test --watch
 ## Milestones
 
 - [x] **M0**: Infrastructure (Docker, config, health, Letta client)
-- [ ] **M1**: E2E Chat (Telegram bot, basic message flow)
+- [x] **M1**: E2E Chat (Telegram bot, basic message flow)
 - [ ] **M2**: Tools + Items (database, capture, breakdown)
 - [ ] **M3**: Tone + Detection (overwhelm, self-bullying)
 - [ ] **M4**: Tiny Wins (win tracking)

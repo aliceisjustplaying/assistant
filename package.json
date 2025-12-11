@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
+    "setup:letta": "bun scripts/setup-letta-provider.ts",
     "typecheck": "tsgo --noEmit",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
