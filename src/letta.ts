@@ -112,31 +112,37 @@ async function registerTools(): Promise<void> {
 
   console.log(`Registering ${String(toolDefs.length)} tools with Letta...`);
 
+  // Build a set of existing tool names to avoid duplicates
+  const existingTools = new Map<string, string>();
+  for await (const tool of client.tools.list()) {
+    if (tool.name !== null && tool.name !== undefined) {
+      existingTools.set(tool.name, tool.id);
+    }
+  }
+
   for (const def of toolDefs) {
     try {
-      // Extract tool name from the json_schema
-      const toolName =
-        def.json_schema && typeof def.json_schema === 'object' && 'function' in def.json_schema
-          ? ((def.json_schema as { function?: { name?: string } }).function?.name ?? 'unknown')
-          : 'unknown';
+      // Extract expected tool name from Python source code (function name)
+      const funcMatch = /^def\s+(\w+)\s*\(/m.exec(def.source_code);
+      const expectedName = funcMatch?.[1] ?? 'unknown';
 
-      // Check if tool already exists by listing and filtering
-      let existingToolId: string | null = null;
-      for await (const tool of client.tools.list()) {
-        if (tool.name === toolName) {
-          existingToolId = tool.id;
-          break;
-        }
-      }
-
-      if (existingToolId !== null) {
-        console.log(`  Tool '${toolName}' already exists (${existingToolId})`);
-        registeredToolIds.set(toolName, existingToolId);
+      // Check if tool already exists
+      const existingId = existingTools.get(expectedName);
+      if (existingId !== undefined) {
+        // Update existing tool with new source code and json_schema
+        await client.tools.update(existingId, {
+          source_code: def.source_code,
+          description: def.description ?? null,
+          json_schema: def.json_schema ?? null,
+        });
+        console.log(`  Updated tool '${expectedName}' (${existingId})`);
+        registeredToolIds.set(expectedName, existingId);
       } else {
-        // Create new tool
+        // Create new tool - Letta extracts name from source_code
         const created = await client.tools.create(def);
-        console.log(`  Created tool '${toolName}' (${created.id})`);
-        registeredToolIds.set(toolName, created.id);
+        const createdName = created.name ?? expectedName;
+        console.log(`  Created tool '${createdName}' (${created.id})`);
+        registeredToolIds.set(createdName, created.id);
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

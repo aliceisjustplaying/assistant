@@ -55,13 +55,12 @@ async function getOrCreateAgentForUser(userId: number, username?: string): Promi
 
     // Workaround for Letta bug: openai-proxy/ handles are rejected during creation
     // but work when set via llm_config modification.
-    // Step 1: Create agent with letta-free model
+    // Step 1: Create agent with letta-free model (tools attached separately in step 3)
     const agentState = await client.agents.create({
       name: `user-${userId.toString()}-${usernameOrUnknown}`,
       description: `ADHD support agent for Telegram user ${userId.toString()}`,
       model: 'letta/letta-free',
       embedding: 'letta/letta-free',
-      tool_ids: toolIds,
       memory_blocks: [
         {
           label: 'persona',
@@ -103,6 +102,17 @@ You have access to tools for managing tasks and items. Use them to help users:
     });
 
     console.log(`Agent ${agentState.id} configured with Claude Opus 4.5`);
+
+    // Step 3: Attach tools to agent (tool_ids in create doesn't work with letta-free)
+    // SDK signature: attach(toolID, {agent_id})
+    for (const toolId of toolIds) {
+      try {
+        await client.agents.tools.attach(toolId, { agent_id: agentState.id });
+      } catch (attachErr) {
+        console.warn(`Failed to attach tool ${toolId}:`, attachErr);
+      }
+    }
+    console.log(`Attached ${String(toolIds.length)} tools to agent`);
 
     // Store the mapping
     userAgentMap.set(userId, agentState.id);
