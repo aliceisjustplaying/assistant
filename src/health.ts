@@ -58,7 +58,7 @@ export async function healthCheck(): Promise<Response> {
 
   // Letta: Check health endpoint (fast, doesn't query agents)
   try {
-    const res = await fetch(`${config.LETTA_BASE_URL}/v1/health`, {
+    const res = await fetch(`${config.LETTA_BASE_URL}/v1/health/`, {
       method: "GET",
       signal: AbortSignal.timeout(5000), // 5s timeout
     });
