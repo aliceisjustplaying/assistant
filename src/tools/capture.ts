@@ -36,32 +36,60 @@ export interface ParseBrainDumpResult {
 /**
  * Parse brain dump text to extract tasks and ideas
  *
- * Uses simple heuristics for M2:
- * - Lines starting with "- ", "* ", "TODO", numbers, or action verbs are tasks
- * - Other lines are ideas
- * - Strips common prefixes and cleans up text
+ * Handles both structured (bullet points) and unstructured (stream-of-consciousness) text.
+ * Extracts tasks based on:
+ * - Explicit list markers (-, *, numbers, TODO)
+ * - Intent phrases ("need to", "have to", "gotta", "should")
+ * - Action verbs at sentence starts
  */
 function parseBrainDump(text: string): { tasks: string[]; ideas: string[] } {
+  const tasks: string[] = [];
+  const ideas: string[] = [];
+
+  // Common task prefixes to strip from list items
+  const taskPrefixes = [/^-\s+/, /^\*\s+/, /^\d+[).]\s+/, /^TODO:?\s*/i, /^TASK:?\s*/i];
+
+  // Action verbs that indicate tasks
+  const actionVerbs =
+    /^(add|create|implement|fix|update|write|build|test|review|refactor|delete|remove|setup|configure|install|deploy|investigate|research|learn|study|call|email|message|buy|order|schedule|plan|organize|clean|finish|complete|start|begin|send|check|get|make|do|prepare|submit|apply|respond|reply|contact|reach|follow|set|book|cancel|return|pick|drop)\b/i;
+
+  // Intent phrases that signal tasks (captures "I need to X", "gotta X", etc.)
+  const intentPatterns = [
+    /\b(?:i\s+)?(?:need|have|got|gotta|should|must|want)\s+to\s+(\w+(?:\s+\w+){0,10}?)(?:\.|,|$|(?=\s+(?:and|but|i\s|i'm|also)))/gi,
+    /\b(?:i'm|i\s+am)\s+(?:gonna|going\s+to)\s+(\w+(?:\s+\w+){0,10}?)(?:\.|,|$|(?=\s+(?:and|but|i\s|i'm|also)))/gi,
+    /\bfinally\s+(\w+(?:\s+\w+){0,10}?)(?:\.|,|$|(?=\s+(?:and|but|i\s|i'm|also)))/gi,
+  ];
+
+  // First, try to extract tasks from intent phrases in unstructured text
+  const extractedTasks = new Set<string>();
+  for (const pattern of intentPatterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const task = match[1]?.trim() ?? '';
+      if (task.length > 2 && task.length < 200) {
+        // Clean up the task - capitalize first letter
+        const cleanTask = task.charAt(0).toUpperCase() + task.slice(1);
+        extractedTasks.add(cleanTask);
+      }
+    }
+  }
+
+  // Add extracted tasks
+  for (const task of extractedTasks) {
+    tasks.push(task);
+  }
+
+  // Then process line by line for structured input
   const lines = text
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 
-  const tasks: string[] = [];
-  const ideas: string[] = [];
-
-  // Common task prefixes to strip
-  const taskPrefixes = [/^-\s+/, /^\*\s+/, /^\d+[).]\s+/, /^TODO:?\s*/i, /^TASK:?\s*/i];
-
-  // Action verbs that indicate tasks
-  const actionVerbs =
-    /^(add|create|implement|fix|update|write|build|test|review|refactor|delete|remove|setup|configure|install|deploy|investigate|research|learn|study|call|email|message|buy|order|schedule|plan|organize|clean|finish|complete|start|begin)\b/i;
-
   for (const line of lines) {
     let content = line;
     let isTask = false;
 
-    // Check for task prefixes
+    // Check for task prefixes (bullet points, numbers)
     for (const prefix of taskPrefixes) {
       if (prefix.test(content)) {
         content = content.replace(prefix, '');
@@ -70,7 +98,7 @@ function parseBrainDump(text: string): { tasks: string[]; ideas: string[] } {
       }
     }
 
-    // If no prefix matched, check for action verbs
+    // If no prefix matched, check for action verbs at line start
     if (!isTask && actionVerbs.test(content)) {
       isTask = true;
     }
@@ -80,11 +108,21 @@ function parseBrainDump(text: string): { tasks: string[]; ideas: string[] } {
 
     if (content.length > 0) {
       if (isTask) {
-        tasks.push(content);
-      } else {
+        // Avoid duplicates from intent extraction
+        if (!tasks.some((t) => t.toLowerCase() === content.toLowerCase())) {
+          tasks.push(content);
+        }
+      } else if (tasks.length === 0) {
+        // Only add as idea if we didn't extract any tasks from it
+        // (to avoid storing the whole brain dump as an idea when we extracted tasks)
         ideas.push(content);
       }
     }
+  }
+
+  // If we extracted tasks but the whole text was one line, don't store it as an idea
+  if (tasks.length > 0 && ideas.length === 1 && ideas[0] === text.trim()) {
+    ideas.length = 0;
   }
 
   return { tasks, ideas };
