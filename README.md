@@ -132,6 +132,7 @@ bun run start
    ```
 start - Start the bot
 help - Show help
+reset - Reset the agent (clear memory)
 dump - Brain dump mode
 focus - Set current focus
 wins - Show recent wins
@@ -214,7 +215,8 @@ bun test --watch
 │       ├── items.ts       # save_item, update_item tools
 │       └── context.ts     # get_open_items tool
 ├── scripts/
-│   └── setup-letta-provider.ts  # Setup verification
+│   ├── setup-letta-provider.ts  # Setup verification
+│   └── cleanup-agents.ts        # Delete stale Letta agents
 ├── drizzle.config.ts      # Drizzle Kit configuration
 ├── litellm-config.yaml    # LiteLLM model configuration
 ├── docker-compose.yml
@@ -267,8 +269,10 @@ docker compose logs letta
 ### Can't connect to Telegram
 
 1. Verify bot token is correct
-2. Check if another instance is running (only one can poll at a time)
-3. For webhooks, ensure URL is publicly accessible with valid HTTPS
+2. For webhooks, ensure URL is publicly accessible with valid HTTPS
+3. If you see a 409 "terminated by other getUpdates request" error, another bot instance may be running - kill it and restart
+
+Note: Hot reload (`bun run dev`) handles this automatically by stopping the bot before restarting.
 
 ### Tools not working / "missing required parameter"
 
