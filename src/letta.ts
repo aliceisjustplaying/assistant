@@ -56,21 +56,26 @@ export async function ensureProvider(): Promise<string> {
       `Letta is accessible. Found ${llmModels.length.toString()} LLM models and ${embeddingModels.length.toString()} embedding models.`
     );
 
-    // Log available Anthropic models
-    const anthropicModels = llmModels.filter(
-      (m) => m.provider_type === 'anthropic' || (m.provider_name?.includes('anthropic') ?? false)
+    // Log available Claude models (via LiteLLM/openai-proxy or native Anthropic)
+    const claudeModels = llmModels.filter(
+      (m) =>
+        m.provider_type === 'anthropic' ||
+        (m.provider_name?.includes('litellm') ?? false) ||
+        (m.handle?.includes('claude') ?? false) ||
+        (m.handle?.includes('openai-proxy') ?? false) ||
+        m.name.includes('claude')
     );
 
-    if (anthropicModels.length > 0) {
-      console.log(`Found ${anthropicModels.length.toString()} Anthropic model(s):`);
-      anthropicModels.forEach((m) => {
+    if (claudeModels.length > 0) {
+      console.log(`Found ${claudeModels.length.toString()} Claude model(s):`);
+      claudeModels.forEach((m) => {
         console.log(`  - ${m.handle ?? m.name}`);
       });
     } else {
       console.warn(
-        '⚠️  No Anthropic models found. ' +
+        '⚠️  No Claude models found. ' +
           'Make sure the anthropic-proxy is configured as a provider in Letta server. ' +
-          "This may need to be done via Letta's admin interface or configuration."
+          'Run: bun run setup:letta'
       );
     }
 

@@ -58,9 +58,12 @@ export const config = {
   TELEGRAM_WEBHOOK_SECRET_TOKEN: optionalEnv('TELEGRAM_WEBHOOK_SECRET_TOKEN', ''),
 
   // === Anthropic Proxy ===
-  ANTHROPIC_PROXY_URL: requireEnv('ANTHROPIC_PROXY_URL'),
-  ANTHROPIC_PROXY_SESSION_SECRET: requireEnv('ANTHROPIC_PROXY_SESSION_SECRET'),
+  ANTHROPIC_PROXY_URL: optionalEnv('ANTHROPIC_PROXY_URL', 'http://localhost:4001'),
+  ANTHROPIC_PROXY_SESSION_SECRET: optionalEnv('ANTHROPIC_PROXY_SESSION_SECRET', ''),
   ANTHROPIC_PROXY_SESSION_ID: optionalEnv('ANTHROPIC_PROXY_SESSION_ID', ''),
+
+  // === LiteLLM ===
+  LITELLM_URL: optionalEnv('LITELLM_URL', 'http://localhost:4000'),
 
   // === OpenAI (embeddings only) ===
   OPENAI_API_KEY: requireEnv('OPENAI_API_KEY'),
@@ -94,12 +97,6 @@ export function validateConfig(): void {
     throw new Error(`LETTA_BASE_URL must be a valid URL, got: ${config.LETTA_BASE_URL}`);
   }
 
-  try {
-    new URL(config.ANTHROPIC_PROXY_URL);
-  } catch {
-    throw new Error(`ANTHROPIC_PROXY_URL must be a valid URL, got: ${config.ANTHROPIC_PROXY_URL}`);
-  }
-
   if (hasWebhookUrl) {
     try {
       new URL(config.TELEGRAM_WEBHOOK_URL);
@@ -108,10 +105,10 @@ export function validateConfig(): void {
     }
   }
 
-  // Warn if session ID is missing (needed for Anthropic proxy to work)
-  if (!config.ANTHROPIC_PROXY_SESSION_ID) {
+  // Warn if session ID is missing (needed for anthropic-proxy OAuth to work)
+  if (config.ANTHROPIC_PROXY_SESSION_ID === '') {
     console.warn(
-      '⚠️  ANTHROPIC_PROXY_SESSION_ID is not set. ' + 'The Anthropic proxy will not work until OAuth flow is completed.'
+      '⚠️  ANTHROPIC_PROXY_SESSION_ID is not set. ' + 'Complete OAuth flow at http://localhost:4001/auth/device'
     );
   }
 

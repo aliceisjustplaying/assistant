@@ -3,7 +3,7 @@
  *
  * Checks the health of all critical dependencies:
  * - Letta API server
- * - Anthropic proxy
+ * - LiteLLM proxy
  * - Database (optional for M0, will be enabled in M2)
  *
  * Returns 200 if all services are healthy, 503 if any are down.
@@ -16,7 +16,7 @@ export interface HealthCheckResult {
   checks: {
     db: boolean;
     letta: boolean;
-    proxy: boolean;
+    litellm: boolean;
   };
 }
 
@@ -29,7 +29,7 @@ export async function healthCheck(): Promise<Response> {
   const checks = {
     db: false,
     letta: false,
-    proxy: false,
+    litellm: false,
   };
 
   // DB: Optional for M0 (database module doesn't exist yet)
@@ -49,17 +49,16 @@ export async function healthCheck(): Promise<Response> {
     checks.letta = false;
   }
 
-  // Proxy: Check health endpoint
+  // LiteLLM: Check health endpoint
   try {
-    const proxyHealthUrl = config.ANTHROPIC_PROXY_URL.replace('/v1', '/health');
-    const res = await fetch(proxyHealthUrl, {
+    const res = await fetch(`${config.LITELLM_URL}/health`, {
       method: 'GET',
       signal: AbortSignal.timeout(5000), // 5s timeout
     });
-    checks.proxy = res.ok;
+    checks.litellm = res.ok;
   } catch (error) {
-    console.error('Proxy health check failed:', error);
-    checks.proxy = false;
+    console.error('LiteLLM health check failed:', error);
+    checks.litellm = false;
   }
 
   // Overall health: all checks must pass

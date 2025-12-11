@@ -13,7 +13,7 @@ describe('Health Check Integration', () => {
   test('healthCheck uses config values', async () => {
     // Verify that healthCheck is using the config module
     expect(config.LETTA_BASE_URL).toBeDefined();
-    expect(config.ANTHROPIC_PROXY_URL).toBeDefined();
+    expect(config.LITELLM_URL).toBeDefined();
 
     const response = await healthCheck();
     expect(response).toBeDefined();
@@ -41,13 +41,13 @@ describe('Health Check Integration', () => {
     expect(body).toHaveProperty('checks');
     expect(body.checks).toHaveProperty('db');
     expect(body.checks).toHaveProperty('letta');
-    expect(body.checks).toHaveProperty('proxy');
+    expect(body.checks).toHaveProperty('litellm');
 
     // Verify types
     expect(typeof body.healthy).toBe('boolean');
     expect(typeof body.checks.db).toBe('boolean');
     expect(typeof body.checks.letta).toBe('boolean');
-    expect(typeof body.checks.proxy).toBe('boolean');
+    expect(typeof body.checks.litellm).toBe('boolean');
   });
 
   test('healthCheck status matches healthy field', async () => {
@@ -64,11 +64,11 @@ describe('Health Check Integration', () => {
       expect(response.status).toBe(200);
       // All checks should be true when healthy
       expect(body.checks.letta).toBe(true);
-      expect(body.checks.proxy).toBe(true);
+      expect(body.checks.litellm).toBe(true);
     } else {
       expect(response.status).toBe(503);
       // At least one check should be false when unhealthy
-      const anyFailed = !body.checks.letta || !body.checks.proxy;
+      const anyFailed = !body.checks.letta || !body.checks.litellm;
       expect(anyFailed).toBe(true);
     }
   });
