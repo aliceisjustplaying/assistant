@@ -48,11 +48,13 @@ services:
       - app
 
   # Netdata: Real-time monitoring
-  # Access via https://netdata.assistant.mosphere.at (basic auth protected)
+  # Access via Tailscale: http://TAILSCALE_IP:19999
   netdata:
     image: netdata/netdata
     restart: unless-stopped
     hostname: assistant
+    ports:
+      - '19999:19999'
     cap_add:
       - SYS_PTRACE
     security_opt:

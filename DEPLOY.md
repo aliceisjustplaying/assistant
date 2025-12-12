@@ -78,6 +78,14 @@ Install mosh and git:
 apt install -y mosh git
 ```
 
+Install Tailscale (for secure access to internal services):
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale up
+```
+
+Follow the link to authenticate with your Tailscale account. Note your server's Tailscale IP (100.x.x.x).
+
 Install GitHub CLI:
 ```bash
 (type -p wget >/dev/null || (apt update && apt install wget -y)) && mkdir -p -m 755 /etc/apt/keyrings && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg && cat $out | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && apt update && apt install gh -y
@@ -129,13 +137,7 @@ cp Caddyfile.example Caddyfile
 vim Caddyfile
 ```
 
-Generate a password hash for Netdata basic auth:
-```bash
-docker run --rm -it caddy caddy hash-password
-# Enter your password when prompted, copy the hash into Caddyfile
-```
-
-Replace domains and password hash with your values.
+Replace the example domains with your actual domains.
 
 ---
 
@@ -252,11 +254,19 @@ curl https://assistant.yourdomain.com/health
 
 ## Monitoring
 
-Netdata is included for real-time monitoring, exposed via Caddy with basic auth.
+Netdata is included for real-time monitoring, accessible via Tailscale.
 
 ### Access Netdata
 
-Open https://netdata.assistant.yourdomain.com and enter your basic auth credentials.
+From any device on your Tailscale network, open:
+```
+http://YOUR_TAILSCALE_IP:19999
+```
+
+Or use the Tailscale hostname:
+```
+http://assistant:19999
+```
 
 ### What you get
 
@@ -268,13 +278,10 @@ Open https://netdata.assistant.yourdomain.com and enter your basic auth credenti
 
 For alerts and multi-server dashboards:
 
-1. Sign up at https://app.netdata.cloud
-2. Get your claim token
-3. Add to `.env`:
-   ```
-   NETDATA_CLAIM_TOKEN=your_token
-   ```
-4. Restart: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+- Sign up at https://app.netdata.cloud
+- Get your claim token
+- Add `NETDATA_CLAIM_TOKEN=your_token` to `.env`
+- Restart: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
 
 ---
 
@@ -359,47 +366,47 @@ free -h
 ## Architecture
 
 ```
-Internet
-    │
-    ▼
-┌─────────────────────────────────────────────────────┐
-│ Hetzner CX33 (Debian 13 + Docker)                   │
-│                                                     │
-│  ┌──────────────────────────────────────┐           │
-│  │ Caddy (:80/:443) - auto-SSL          │           │
-│  │  ├─► app:3000      (assistant.*)     │           │
-│  │  └─► netdata:19999 (netdata.*)       │           │
-│  └──────────────────────────────────────┘           │
-│                    │                                │
-│                    ▼                                │
-│          ┌──────────────────┐                       │
-│          │ app (Bun :3000)  │                       │
-│          │ Telegram webhook │                       │
-│          └────────┬─────────┘                       │
-│                   │                                 │
-│                   ▼                                 │
-│          ┌──────────────────┐   ┌───────────────┐   │
-│          │ letta (:8283)    │   │ netdata       │   │
-│          │ Agent + Memory   │   │ monitoring    │   │
-│          └────────┬─────────┘   └───────────────┘   │
-│                   │                                 │
-│                   ▼                                 │
-│          ┌──────────────────┐                       │
-│          │ litellm (:4000)  │                       │
-│          └────────┬─────────┘                       │
-│                   │                                 │
-│                   ▼                                 │
-│          ┌──────────────────┐                       │
-│          │ auth-adapter     │                       │
-│          │ (:4002) headers  │                       │
-│          └────────┬─────────┘                       │
-│                   │                                 │
-│                   ▼                                 │
-│          ┌──────────────────┐                       │
-│          │ anthropic-proxy  │                       │
-│          │ (:4001) OAuth    │                       │
-│          └────────┬─────────┘                       │
-└───────────────────┼─────────────────────────────────┘
+Internet                              Tailscale Network
+    │                                        │
+    ▼                                        ▼
+┌────────────────────────────────────────────────────────────┐
+│ Hetzner CX33 (Debian 13 + Docker + Tailscale)              │
+│                                                            │
+│  ┌──────────────────────────────────────┐                  │
+│  │ Caddy (:80/:443) - auto-SSL          │                  │
+│  │  ├─► app:3000      (assistant.*)     │                  │
+│  │  └─► letta:8283    (letta.*)         │                  │
+│  └──────────────────────────────────────┘                  │
+│                    │                                       │
+│                    ▼                                       │
+│          ┌──────────────────┐   ┌───────────────────────┐  │
+│          │ app (Bun :3000)  │   │ netdata (:19999)      │  │
+│          │ Telegram webhook │   │ via Tailscale only    │  │
+│          └────────┬─────────┘   └───────────────────────┘  │
+│                   │                                        │
+│                   ▼                                        │
+│          ┌──────────────────┐                              │
+│          │ letta (:8283)    │                              │
+│          │ Agent + Memory   │                              │
+│          └────────┬─────────┘                              │
+│                   │                                        │
+│                   ▼                                        │
+│          ┌──────────────────┐                              │
+│          │ litellm (:4000)  │                              │
+│          └────────┬─────────┘                              │
+│                   │                                        │
+│                   ▼                                        │
+│          ┌──────────────────┐                              │
+│          │ auth-adapter     │                              │
+│          │ (:4002) headers  │                              │
+│          └────────┬─────────┘                              │
+│                   │                                        │
+│                   ▼                                        │
+│          ┌──────────────────┐                              │
+│          │ anthropic-proxy  │                              │
+│          │ (:4001) OAuth    │                              │
+│          └────────┬─────────┘                              │
+└───────────────────┼────────────────────────────────────────┘
                     │
                     ▼
              Anthropic API
