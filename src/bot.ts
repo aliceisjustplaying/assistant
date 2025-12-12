@@ -368,7 +368,7 @@ bot.on('message', async (ctx: Context) => {
   }
 
   // Get user ID for detection (needed to save parsed items)
-  const userId = ctx.from?.id ?? 0;
+  const userId = ctx.from?.id ?? null;
 
   try {
     // Show typing indicator while processing

@@ -76,6 +76,7 @@ export interface DetectionResult {
   parsed?: {
     tasks: { content: string; priority: number }[];
     ideas: { content: string }[];
+    saved: boolean;
     savedTaskIds: string[];
     savedIdeaIds: string[];
   };
@@ -381,10 +382,10 @@ async function saveParsedItems(
  * Main detection function - classifies message and optionally parses brain dumps
  *
  * @param text - User message
- * @param userId - Telegram user ID for saving parsed items
+ * @param userId - Telegram user ID for saving parsed items (optional)
  * @returns Detection result with classification and any parsed items
  */
-export async function detectAndParse(text: string, userId: number): Promise<DetectionResult> {
+export async function detectAndParse(text: string, userId: number | null): Promise<DetectionResult> {
   // Quick pre-filter
   if (!shouldTriggerDetection(text)) {
     return {
@@ -398,38 +399,10 @@ export async function detectAndParse(text: string, userId: number): Promise<Dete
 
   console.log('Detection triggered, calling Haiku for classification...');
 
+  // Step 1: Classify with Haiku
+  let classification: Awaited<ReturnType<typeof classifyWithHaiku>>;
   try {
-    // Step 1: Classify with Haiku
-    const classification = await classifyWithHaiku(text);
-
-    console.log('Haiku classification:', classification);
-
-    const result: DetectionResult = {
-      triggered: true,
-      ...classification,
-    };
-
-    // Step 2: If brain dump detected, parse and save in parallel
-    if (classification.brainDump) {
-      console.log('Brain dump detected, parsing with Haiku...');
-
-      const { tasks, ideas } = await parseBrainDumpWithHaiku(text);
-
-      if (tasks.length > 0 || ideas.length > 0) {
-        const { taskIds, ideaIds } = await saveParsedItems(userId, tasks, ideas);
-
-        result.parsed = {
-          tasks,
-          ideas,
-          savedTaskIds: taskIds,
-          savedIdeaIds: ideaIds,
-        };
-
-        console.log(`Parsed brain dump: ${String(tasks.length)} tasks, ${String(ideas.length)} ideas saved`);
-      }
-    }
-
-    return result;
+    classification = await classifyWithHaiku(text);
   } catch (error) {
     console.error('Detection error:', error);
     // On error, return safe defaults but mark as triggered so we know something happened
@@ -442,6 +415,76 @@ export async function detectAndParse(text: string, userId: number): Promise<Dete
       reasoning: `Detection error: ${error instanceof Error ? error.message : 'Unknown'}`,
     };
   }
+
+  console.log('Haiku classification:', classification);
+
+  const result: DetectionResult = {
+    triggered: true,
+    ...classification,
+  };
+
+  const appendReasoning = (extra: string): void => {
+    if (extra === '') {
+      return;
+    }
+    result.reasoning =
+      result.reasoning !== undefined && result.reasoning !== '' ? `${result.reasoning}\n${extra}` : extra;
+  };
+
+  // Step 2: If brain dump detected, parse and save (if possible)
+  if (classification.brainDump) {
+    console.log('Brain dump detected, parsing with Haiku...');
+
+    try {
+      const { tasks, ideas } = await parseBrainDumpWithHaiku(text);
+
+      if (tasks.length > 0 || ideas.length > 0) {
+        const saveUserId = typeof userId === 'number' && userId > 0 ? userId : null;
+
+        if (saveUserId !== null) {
+          try {
+            const { taskIds, ideaIds } = await saveParsedItems(saveUserId, tasks, ideas);
+
+            result.parsed = {
+              tasks,
+              ideas,
+              saved: true,
+              savedTaskIds: taskIds,
+              savedIdeaIds: ideaIds,
+            };
+
+            console.log(`Parsed brain dump: ${String(tasks.length)} tasks, ${String(ideas.length)} ideas saved`);
+          } catch (saveError) {
+            console.error('Failed to save parsed items:', saveError);
+            appendReasoning(`save_error=${saveError instanceof Error ? saveError.message : 'Unknown'}`);
+
+            result.parsed = {
+              tasks,
+              ideas,
+              saved: false,
+              savedTaskIds: [],
+              savedIdeaIds: [],
+            };
+          }
+        } else {
+          appendReasoning('save_skipped=no_user_id');
+
+          result.parsed = {
+            tasks,
+            ideas,
+            saved: false,
+            savedTaskIds: [],
+            savedIdeaIds: [],
+          };
+        }
+      }
+    } catch (parseError) {
+      console.error('Failed to parse brain dump:', parseError);
+      appendReasoning(`parse_error=${parseError instanceof Error ? parseError.message : 'Unknown'}`);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -477,8 +520,9 @@ export function formatDetectionContext(result: DetectionResult): string {
   let context = `[DETECTED: ${flags.join(', ')}]`;
 
   if (result.parsed) {
-    const { tasks, ideas } = result.parsed;
-    context += `\n[PARSED & SAVED: ${String(tasks.length)} tasks, ${String(ideas.length)} ideas]`;
+    const { tasks, ideas, saved } = result.parsed;
+    const label = saved ? 'PARSED & SAVED' : 'PARSED (NOT SAVED)';
+    context += `\n[${label}: ${String(tasks.length)} tasks, ${String(ideas.length)} ideas]`;
 
     // Include task summaries for Opus to reference
     if (tasks.length > 0) {

@@ -36,6 +36,7 @@ test('formatDetectionContext includes flags and parsed tasks', () => {
     parsed: {
       tasks: [{ content: 'Call the dentist', priority: 2 }],
       ideas: [{ content: 'Try a standing desk' }],
+      saved: true,
       savedTaskIds: ['task-1'],
       savedIdeaIds: ['idea-1'],
     },
