@@ -1,0 +1,17 @@
+# Copy to Caddyfile and customize:
+#   cp Caddyfile.example Caddyfile
+#   nano Caddyfile
+
+# Main app - Telegram webhook
+assistant.mosphere.at {
+    reverse_proxy app:3000
+}
+
+# Netdata monitoring - basic auth protected
+# Generate password hash: docker run --rm -it caddy caddy hash-password
+netdata.assistant.mosphere.at {
+    basic_auth {
+        admin $2a$14$REPLACE_WITH_YOUR_HASH
+    }
+    reverse_proxy netdata:19999
+}

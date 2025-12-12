@@ -12,7 +12,7 @@ Simple deployment using Docker Compose + Caddy + GitHub Actions.
 
 ---
 
-## Step 1: Create Hetzner VPS
+## Create Hetzner VPS
 
 1. Go to [Hetzner Cloud Console](https://console.hetzner.cloud/)
 2. Create new project or select existing
@@ -37,7 +37,7 @@ Apply to your server.
 
 ---
 
-## Step 2: Point Domain to Server
+## Point Domain to Server
 
 Add DNS A record:
 ```
@@ -48,7 +48,7 @@ Wait 5-10 minutes for propagation.
 
 ---
 
-## Step 3: Server Setup
+## Server Setup
 
 SSH in:
 ```bash
@@ -98,100 +98,50 @@ cd assistant
 
 ---
 
-## Step 4: Configure Environment
+## Configure Environment
 
-Create `.env` file:
+Copy the example and customize:
 ```bash
-cat > .env << 'EOF'
-# Telegram
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_WEBHOOK_URL=https://assistant.yourdomain.com/webhook
-TELEGRAM_WEBHOOK_SECRET_TOKEN=generate_random_string
-
-# Anthropic Proxy
-ANTHROPIC_PROXY_SESSION_SECRET=generate_32_char_random_string
-ANTHROPIC_PROXY_SESSION_ID=set_after_oauth
-
-# OpenAI (for embeddings)
-OPENAI_API_KEY=sk-your-key
-
-# Internal
-LETTA_BASE_URL=http://letta:8283
-LITELLM_URL=http://litellm:4000
-TOOL_WEBHOOK_URL=http://app:3000
-EOF
+cp .env.example .env
+vim .env
 ```
 
-Generate random strings:
+Generate random strings for secrets:
 ```bash
-openssl rand -hex 32  # For SESSION_SECRET
-openssl rand -hex 16  # For WEBHOOK_SECRET_TOKEN
+openssl rand -hex 32  # For ANTHROPIC_PROXY_SESSION_SECRET
+openssl rand -hex 16  # For TELEGRAM_WEBHOOK_SECRET_TOKEN
 ```
 
-Edit `.env` with your values:
-```bash
-nano .env
-```
+Key values to set:
+- `TELEGRAM_BOT_TOKEN` - from @BotFather
+- `TELEGRAM_WEBHOOK_URL` - `https://assistant.yourdomain.com/webhook`
+- `TELEGRAM_WEBHOOK_SECRET_TOKEN` - generated above
+- `ANTHROPIC_PROXY_SESSION_SECRET` - generated above
+- `OPENAI_API_KEY` - your OpenAI key
 
 ---
 
-## Step 5: Configure Caddy
+## Configure Caddy
 
-Create `Caddyfile`:
+Copy the example and customize:
 ```bash
-cat > Caddyfile << 'EOF'
-assistant.yourdomain.com {
-    reverse_proxy app:3000
-}
-EOF
+cp Caddyfile.example Caddyfile
+vim Caddyfile
 ```
 
-Replace `assistant.yourdomain.com` with your actual domain.
+Generate a password hash for Netdata basic auth:
+```bash
+docker run --rm -it caddy caddy hash-password
+# Enter your password when prompted, copy the hash into Caddyfile
+```
+
+Replace domains and password hash with your values.
 
 ---
 
-## Step 6: Create Production Compose Override
+## Deploy
 
-Create `docker-compose.prod.yml`:
-```bash
-cat > docker-compose.prod.yml << 'EOF'
-services:
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
-
-  app:
-    restart: unless-stopped
-
-  letta:
-    restart: unless-stopped
-
-  litellm:
-    restart: unless-stopped
-
-  anthropic-proxy:
-    restart: unless-stopped
-
-volumes:
-  caddy_data:
-  caddy_config:
-EOF
-```
-
----
-
-## Step 7: Deploy
-
-Start all services:
+Start all services (production compose file is included in the repo):
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
@@ -204,7 +154,7 @@ docker compose logs -f app
 
 ---
 
-## Step 8: Anthropic OAuth
+## Anthropic OAuth
 
 Complete one-time OAuth setup:
 
@@ -233,7 +183,7 @@ Complete one-time OAuth setup:
 
 ---
 
-## Step 9: Set Telegram Webhook
+## Set Telegram Webhook
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
@@ -251,18 +201,12 @@ curl "https://api.telegram.org/bot<BOT_TOKEN>/getWebhookInfo"
 
 ---
 
-## Step 10: Setup Auto-Deploy
+## Setup Auto-Deploy
 
-### On Server: Create deploy script
+### On Server: Make deploy script executable
 
+The `deploy.sh` script is included in the repo. Just make it executable:
 ```bash
-cat > /opt/assistant/deploy.sh << 'EOF'
-#!/bin/bash
-cd /opt/assistant
-git pull origin main
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-docker image prune -f
-EOF
 chmod +x /opt/assistant/deploy.sh
 ```
 
@@ -286,27 +230,7 @@ Go to repo **Settings → Secrets and variables → Actions**, add:
 - `HOST`: Your server IP
 - `SSH_KEY`: The private key from above
 
-### On GitHub: Create workflow
-
-Create `.github/workflows/deploy.yml`:
-```yaml
-name: Deploy
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.HOST }}
-          username: root
-          key: ${{ secrets.SSH_KEY }}
-          script: /opt/assistant/deploy.sh
-```
+The workflow file (`.github/workflows/deploy.yml`) is already in the repo.
 
 Now every push to `main` triggers automatic deployment.
 
@@ -323,6 +247,34 @@ Check health:
 ```bash
 curl https://assistant.yourdomain.com/health
 ```
+
+---
+
+## Monitoring
+
+Netdata is included for real-time monitoring, exposed via Caddy with basic auth.
+
+### Access Netdata
+
+Open https://netdata.assistant.yourdomain.com and enter your basic auth credentials.
+
+### What you get
+
+- CPU, RAM, disk, network graphs (1-second resolution)
+- Per-container Docker metrics (CPU, memory, I/O)
+- ~2 weeks retention by default
+
+### Optional: Netdata Cloud
+
+For alerts and multi-server dashboards:
+
+1. Sign up at https://app.netdata.cloud
+2. Get your claim token
+3. Add to `.env`:
+   ```
+   NETDATA_CLAIM_TOKEN=your_token
+   ```
+4. Restart: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
 
 ---
 
@@ -410,32 +362,39 @@ free -h
 Internet
     │
     ▼
-┌───────────────────────────────────────┐
-│ Hetzner CX33 (Debian 13 + Docker)     │
-│                                       │
-│  ┌──────────┐    ┌──────────────────┐ │
-│  │ Caddy    │───►│ app (Bun :3000)  │ │
-│  │ :80/:443 │    │ Telegram webhook │ │
-│  │ auto-SSL │    └────────┬─────────┘ │
-│  └──────────┘             │           │
-│                           ▼           │
-│               ┌──────────────────┐    │
-│               │ letta (:8283)    │    │
-│               │ Agent + Memory   │    │
-│               └────────┬─────────┘    │
-│                        │              │
-│                        ▼              │
-│               ┌──────────────────┐    │
-│               │ litellm (:4000)  │    │
-│               └────────┬─────────┘    │
-│                        │              │
-│                        ▼              │
-│               ┌──────────────────┐    │
-│               │anthropic-proxy   │    │
-│               │ (:4001) OAuth    │    │
-│               └────────┬─────────┘    │
-└────────────────────────┼──────────────┘
-                         │
-                         ▼
-                  Anthropic API
+┌─────────────────────────────────────────────────────┐
+│ Hetzner CX33 (Debian 13 + Docker)                   │
+│                                                     │
+│  ┌──────────────────────────────────────┐           │
+│  │ Caddy (:80/:443) - auto-SSL          │           │
+│  │  ├─► app:3000      (assistant.*)     │           │
+│  │  └─► netdata:19999 (netdata.*)       │           │
+│  └──────────────────────────────────────┘           │
+│                    │                                │
+│                    ▼                                │
+│          ┌──────────────────┐                       │
+│          │ app (Bun :3000)  │                       │
+│          │ Telegram webhook │                       │
+│          └────────┬─────────┘                       │
+│                   │                                 │
+│                   ▼                                 │
+│          ┌──────────────────┐   ┌───────────────┐   │
+│          │ letta (:8283)    │   │ netdata       │   │
+│          │ Agent + Memory   │   │ monitoring    │   │
+│          └────────┬─────────┘   └───────────────┘   │
+│                   │                                 │
+│                   ▼                                 │
+│          ┌──────────────────┐                       │
+│          │ litellm (:4000)  │                       │
+│          └────────┬─────────┘                       │
+│                   │                                 │
+│                   ▼                                 │
+│          ┌──────────────────┐                       │
+│          │ anthropic-proxy  │                       │
+│          │ (:4001) OAuth    │                       │
+│          └────────┬─────────┘                       │
+└───────────────────┼─────────────────────────────────┘
+                    │
+                    ▼
+             Anthropic API
 ```
