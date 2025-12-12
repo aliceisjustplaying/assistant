@@ -25,6 +25,7 @@ services:
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:4001/health']
       interval: 30s
+      start_interval: 2s
       timeout: 10s
       retries: 3
 
@@ -50,6 +51,7 @@ services:
     healthcheck:
       test: ['CMD', 'bun', '-e', "fetch('http://localhost:4002/health').then(r => process.exit(r.ok ? 0 : 1))"]
       interval: 30s
+      start_interval: 2s
       timeout: 10s
       retries: 3
 
@@ -58,8 +60,7 @@ services:
     image: ghcr.io/berriai/litellm:main-latest
     ports:
       - '4000:4000'
-    environment:
-      - ANTHROPIC_PROXY_SESSION_ID=${ANTHROPIC_PROXY_SESSION_ID}
+    env_file: .env
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     command: ['--config', '/app/config.yaml', '--port', '4000']
@@ -72,6 +73,7 @@ services:
     healthcheck:
       test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:4000/health')"]
       interval: 30s
+      start_interval: 2s
       timeout: 10s
       retries: 3
 
@@ -95,38 +97,9 @@ services:
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8283/v1/health']
       interval: 30s
+      start_interval: 2s
       timeout: 10s
       retries: 3
-
-  # app:
-  #   build: .
-  #   ports:
-  #     - '3000:3000'
-  #   environment:
-  #     - PORT=3000
-  #     - LETTA_BASE_URL=http://letta:8283
-  #     - LITELLM_URL=http://litellm:4000
-  #     - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-  #     - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL}
-  #     - TELEGRAM_WEBHOOK_SECRET_TOKEN=${TELEGRAM_WEBHOOK_SECRET_TOKEN}
-  #     - ANTHROPIC_PROXY_URL=http://anthropic-proxy:4001/v1
-  #     - ANTHROPIC_PROXY_SESSION_ID=${ANTHROPIC_PROXY_SESSION_ID}
-  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
-  #     # Tool webhook URL - Letta calls back to app via Docker network
-  #     - TOOL_WEBHOOK_URL=http://app:3000
-  #   volumes:
-  #     - ./data:/app/data
-  #   networks:
-  #     - assistant-net
-  #   restart: unless-stopped
-  #   depends_on:
-  #     letta:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
 
 volumes:
   letta-data:

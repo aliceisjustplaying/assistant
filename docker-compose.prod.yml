@@ -6,6 +6,32 @@
 # Only ports 80/443 should be open in Hetzner Cloud Firewall
 
 services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    env_file: .env
+    environment:
+      # Docker-internal URLs (override .env values)
+      - LETTA_BASE_URL=http://letta:8283
+      - LITELLM_URL=http://litellm:4000
+      - ANTHROPIC_PROXY_URL=http://anthropic-proxy:4001/v1
+      - TOOL_WEBHOOK_URL=http://app:3000
+    volumes:
+      - ./data:/app/data
+    networks:
+      - assistant-net
+    restart: unless-stopped
+    depends_on:
+      letta:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health']
+      interval: 30s
+      start_interval: 2s
+      timeout: 10s
+      retries: 3
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -39,8 +65,8 @@ services:
       - /sys:/host/sys:ro
       - /etc/os-release:/host/etc/os-release:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    env_file: .env
     environment:
-      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
       - NETDATA_CLAIM_URL=https://app.netdata.cloud
     networks:
       - assistant-net
