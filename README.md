@@ -6,7 +6,11 @@ A Telegram bot that helps with ADHD task management, brain dumps, and gentle acc
 
 ```
 Telegram Bot (Bun)
-       ↓
+       │
+       ├──► Haiku 4.5 Detection ──► LiteLLM ──► Anthropic API
+       │    (overwhelm, brain dump, self-bullying)
+       │
+       ▼
 Letta (port 8283) - AI agent framework
        ↓ OpenAI-compatible API
 LiteLLM (port 4000) - API translation layer
@@ -17,7 +21,8 @@ Anthropic API (Claude Opus 4.5)
 ```
 
 - **Bun**: Runtime and HTTP server for Telegram bot
-- **Letta**: AI agent framework with persistent memory
+- **Haiku 4.5 Detection**: Fast classification of user messages for overwhelm, brain dumps, and self-bullying
+- **Letta**: AI agent framework with persistent memory (uses Opus 4.5)
 - **LiteLLM**: Translates OpenAI-compatible requests to Anthropic format
 - **anthropic-proxy**: OAuth proxy for Anthropic API access
 - **SQLite**: Local storage for items, wins, and context
@@ -118,6 +123,7 @@ bun run start
 | `TELEGRAM_WEBHOOK_SECRET_TOKEN` | (empty) | Webhook verification secret |
 | `ANTHROPIC_PROXY_SESSION_ID` | (empty) | Filled after OAuth flow |
 | `DB_PATH` | `./data/assistant.db` | SQLite database path |
+| `HAIKU_MODEL` | `claude-haiku-4-5-20251001` | Model for fast detection/classification |
 
 ## Telegram Bot Setup
 
@@ -196,6 +202,7 @@ bun test --watch
 │   ├── index.ts           # Main server entry point
 │   ├── bot.ts             # Telegram bot handlers
 │   ├── config.ts          # Environment configuration
+│   ├── detect.ts          # Haiku-based overwhelm/brain dump detection
 │   ├── health.ts          # Health check endpoints
 │   ├── letta.ts           # Letta client bootstrap
 │   ├── db/
@@ -250,7 +257,7 @@ The bot tracks small accomplishments to build momentum and combat ADHD-related f
 - [x] **M0**: Infrastructure (Docker, config, health, Letta client)
 - [x] **M1**: E2E Chat (Telegram bot, basic message flow)
 - [x] **M2**: Tools + Items (database, capture, breakdown)
-- [ ] **M3**: Tone + Detection (overwhelm, self-bullying)
+- [x] **M3**: Tone + Detection (Haiku 4.5 for overwhelm, brain dump, self-bullying)
 - [x] **M4**: Tiny Wins (win tracking, daily breakdown, delete)
 - [ ] **M5**: Threading (focus, deviations)
 - [ ] **M6**: Hardening (idempotency, retries, tests)
