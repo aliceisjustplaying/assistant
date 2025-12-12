@@ -213,7 +213,8 @@ bun test --watch
 │       ├── capture.ts     # parse_brain_dump tool
 │       ├── breakdown.ts   # break_down_task tool
 │       ├── items.ts       # save_item, update_item tools
-│       └── context.ts     # get_open_items tool
+│       ├── context.ts     # get_open_items tool
+│       └── wins.ts        # Tiny wins tools (record, delete, query)
 ├── scripts/
 │   ├── setup-letta-provider.ts  # Setup verification
 │   └── cleanup-agents.ts        # Delete stale Letta agents
@@ -225,13 +226,37 @@ bun test --watch
 └── .env.example
 ```
 
+## Features
+
+### Tiny Wins
+
+The bot tracks small accomplishments to build momentum and combat ADHD-related feelings of underachievement. Every win counts!
+
+**Available tools:**
+
+| Tool | Description |
+|------|-------------|
+| `record_tiny_win` | Record an accomplishment with category and magnitude |
+| `delete_tiny_win` | Remove a win recorded by mistake |
+| `get_wins_by_day` | Get wins for today, yesterday, or a specific date |
+| `get_wins_summary` | Get summary with streaks and category breakdown |
+
+**Categories:** task, habit, self_care, social, work, creative, other
+
+**Magnitudes:** tiny (just did it), small (took effort), medium (meaningful), big (milestone)
+
+**Example interactions:**
+- "I drank water today" → Records a tiny self_care win
+- "What did I accomplish yesterday?" → Shows yesterday's wins with timestamps
+- "Delete that last win, I made a mistake" → Removes the incorrect entry
+
 ## Milestones
 
 - [x] **M0**: Infrastructure (Docker, config, health, Letta client)
 - [x] **M1**: E2E Chat (Telegram bot, basic message flow)
 - [x] **M2**: Tools + Items (database, capture, breakdown)
 - [ ] **M3**: Tone + Detection (overwhelm, self-bullying)
-- [ ] **M4**: Tiny Wins (win tracking)
+- [x] **M4**: Tiny Wins (win tracking, daily breakdown, delete)
 - [ ] **M5**: Threading (focus, deviations)
 - [ ] **M6**: Hardening (idempotency, retries, tests)
 
