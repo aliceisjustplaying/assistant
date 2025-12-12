@@ -84,8 +84,10 @@ services:
     environment:
       # Use LiteLLM as OpenAI-compatible endpoint for Claude models
       - OPENAI_API_BASE=http://litellm:4000
-      # Session ID is passed via LiteLLM extra_headers to anthropic-proxy
       - OPENAI_API_KEY=${ANTHROPIC_PROXY_SESSION_ID}
+      # Password protection for remote access via Letta Cloud ADE
+      - SECURE=${LETTA_SERVER_PASSWORD:+true}
+      - LETTA_SERVER_PASSWORD=${LETTA_SERVER_PASSWORD:-}
     volumes:
       - letta-data:/var/lib/postgresql/data
     networks:

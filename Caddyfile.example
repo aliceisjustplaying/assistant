@@ -7,6 +7,12 @@ assistant.mosphere.at {
     reverse_proxy app:3000
 }
 
+# Letta ADE - password protected by Letta itself (LETTA_SERVER_PASSWORD)
+# Connect via https://app.letta.com → Self-Hosted Server
+letta.assistant.mosphere.at {
+    reverse_proxy letta:8283
+}
+
 # Netdata monitoring - basic auth protected
 # Generate password hash: docker run --rm -it caddy caddy hash-password
 netdata.assistant.mosphere.at {
