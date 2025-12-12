@@ -11,6 +11,7 @@
 import { Telegraf, type Context } from 'telegraf';
 import type { Update } from 'telegraf/types';
 import { config } from './config';
+import { detectAndParse, formatDetectionContext } from './detect';
 import { getLettaClient, getRegisteredToolIds } from './letta';
 
 /**
@@ -366,15 +367,25 @@ bot.on('message', async (ctx: Context) => {
     return;
   }
 
+  // Get user ID for detection (needed to save parsed items)
+  const userId = ctx.from?.id ?? 0;
+
   try {
     // Show typing indicator while processing
     await ctx.sendChatAction('typing');
 
+    // Run Haiku-based detection for overwhelm, brain dumps, self-bullying
+    const detection = await detectAndParse(messageText, userId);
+
+    // Format detection context to prepend to message for Opus
+    const detectionContext = formatDetectionContext(detection);
+
     // Get or create the single agent
     const currentAgentId = await getOrCreateAgent();
 
-    // Send message to agent and get response
-    const response = await sendMessageToAgent(currentAgentId, messageText);
+    // Send message to agent with detection context
+    const messageForAgent = detectionContext + messageText;
+    const response = await sendMessageToAgent(currentAgentId, messageForAgent);
 
     // Reply to user with Markdown formatting (fallback to plain text if parsing fails)
     try {

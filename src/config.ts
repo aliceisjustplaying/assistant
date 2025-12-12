@@ -65,6 +65,9 @@ export const config = {
   // === LiteLLM ===
   LITELLM_URL: optionalEnv('LITELLM_URL', 'http://localhost:4000'),
 
+  // === Models ===
+  HAIKU_MODEL: optionalEnv('HAIKU_MODEL', 'claude-haiku-4-5-20251001'),
+
   // === OpenAI (embeddings only) ===
   OPENAI_API_KEY: requireEnv('OPENAI_API_KEY'),
 
