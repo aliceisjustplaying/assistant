@@ -26,31 +26,7 @@ services:
       timeout: 10s
       retries: 3
 
-  # Auth adapter: adds Accept-Encoding: identity to prevent gzip responses
-  auth-adapter:
-    image: oven/bun:latest
-    working_dir: /app
-    command: ["bun", "run", "src/auth-adapter.ts"]
-    ports:
-      - "4002:4002"
-    environment:
-      - ANTHROPIC_PROXY_INTERNAL_URL=http://anthropic-proxy:4001
-      - AUTH_ADAPTER_PORT=4002
-    volumes:
-      - ./src/auth-adapter.ts:/app/src/auth-adapter.ts:ro
-    networks:
-      - assistant-net
-    restart: unless-stopped
-    depends_on:
-      anthropic-proxy:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "bun", "-e", "fetch('http://localhost:4002/health').then(r => process.exit(r.ok ? 0 : 1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # LiteLLM: OpenAI-compatible API that proxies to auth-adapter -> anthropic-proxy
+  # LiteLLM: OpenAI-compatible API that proxies to anthropic-proxy
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     ports:
@@ -64,7 +40,7 @@ services:
       - assistant-net
     restart: unless-stopped
     depends_on:
-      auth-adapter:
+      anthropic-proxy:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health')"]
@@ -79,7 +55,7 @@ services:
     environment:
       # Use LiteLLM as OpenAI-compatible endpoint for Claude models
       - OPENAI_API_BASE=http://litellm:4000
-      # Session ID is passed as API key to LiteLLM -> auth-adapter -> anthropic-proxy
+      # Session ID is passed via extra_headers to anthropic-proxy
       - OPENAI_API_KEY=${ANTHROPIC_PROXY_SESSION_ID}
     volumes:
       - letta-data:/var/lib/postgresql/data

@@ -10,9 +10,7 @@ Telegram Bot (Bun)
 Letta (port 8283) - AI agent framework
        ↓ OpenAI-compatible API
 LiteLLM (port 4000) - API translation layer
-       ↓ Anthropic API format
-auth-adapter (port 4002) - Header translation
-       ↓
+       ↓ Anthropic API format (with x-api-key header)
 anthropic-proxy (port 4001) - OAuth session management
        ↓
 Anthropic API (Claude Opus 4.5)
@@ -21,7 +19,6 @@ Anthropic API (Claude Opus 4.5)
 - **Bun**: Runtime and HTTP server for Telegram bot
 - **Letta**: AI agent framework with persistent memory
 - **LiteLLM**: Translates OpenAI-compatible requests to Anthropic format
-- **auth-adapter**: Middleware for header translation (Bearer → x-api-key)
 - **anthropic-proxy**: OAuth proxy for Anthropic API access
 - **SQLite**: Local storage for items, wins, and context
 
@@ -59,7 +56,6 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 This starts:
 - `anthropic-proxy` on port 4001 - OAuth proxy for Anthropic API
-- `auth-adapter` on port 4002 - Header translation middleware
 - `litellm` on port 4000 - OpenAI-compatible API proxy
 - `letta` on port 8283 - AI agent framework
 
@@ -202,7 +198,6 @@ bun test --watch
 │   ├── config.ts          # Environment configuration
 │   ├── health.ts          # Health check endpoints
 │   ├── letta.ts           # Letta client bootstrap
-│   ├── auth-adapter.ts    # Header translation middleware
 │   ├── db/
 │   │   ├── index.ts       # Database initialization
 │   │   ├── schema.ts      # Drizzle ORM schema
