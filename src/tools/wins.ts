@@ -3,10 +3,12 @@
  *
  * Provides tools for recording and summarizing tiny wins:
  * - record_tiny_win: Record a small accomplishment
+ * - delete_tiny_win: Delete a win if recorded by mistake
+ * - get_wins_by_day: Get wins for a specific day (today, yesterday, or date)
  * - get_wins_summary: Get a summary of recent wins
  */
 
-import { and, desc, eq, gte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { db, schema } from '../db';
 import { registerTool, type ToolDefinition } from './dispatcher';
 
@@ -42,6 +44,64 @@ export interface RecordTinyWinResult {
   message: string;
   /** Running total of wins today */
   todayCount: number;
+}
+
+/**
+ * Arguments for delete_tiny_win tool
+ */
+export interface DeleteTinyWinArgs {
+  /** ID of the win to delete */
+  id: string;
+}
+
+/**
+ * Result from delete_tiny_win tool
+ */
+export interface DeleteTinyWinResult {
+  /** Whether deletion was successful */
+  success: boolean;
+  /** Message describing the result */
+  message: string;
+  /** The deleted win content (for confirmation) */
+  deletedContent?: string;
+}
+
+/**
+ * Arguments for get_wins_by_day tool
+ */
+export interface GetWinsByDayArgs {
+  /** Period to get wins for: "today", "yesterday", or a specific date in YYYY-MM-DD format */
+  period: string;
+  /** Filter by category (optional) */
+  category?: WinCategory;
+}
+
+/**
+ * A win with timestamp
+ */
+export interface WinEntry {
+  id: string;
+  content: string;
+  category: string;
+  magnitude: string;
+  createdAt: string;
+  time: string;
+}
+
+/**
+ * Result from get_wins_by_day tool
+ */
+export interface GetWinsByDayResult {
+  /** The date being queried (YYYY-MM-DD) */
+  date: string;
+  /** Human-readable label (e.g., "Today", "Yesterday", "Monday, Dec 9") */
+  label: string;
+  /** Total wins on this day */
+  totalWins: number;
+  /** List of wins */
+  wins: WinEntry[];
+  /** Breakdown by category */
+  byCategory: Record<string, number>;
 }
 
 /**
@@ -157,6 +217,198 @@ export const recordTinyWinTool: ToolDefinition<RecordTinyWinArgs, RecordTinyWinR
       id,
       message: baseMessage + streakBonus,
       todayCount,
+    };
+  },
+});
+
+/**
+ * delete_tiny_win tool - Delete a win recorded by mistake
+ */
+export const deleteTinyWinTool: ToolDefinition<DeleteTinyWinArgs, DeleteTinyWinResult> = registerTool({
+  name: 'delete_tiny_win',
+  description:
+    'Delete a tiny win that was recorded by mistake. Use this if the user wants to remove an incorrectly logged win.',
+  parameters: {
+    type: 'object',
+    properties: {
+      id: {
+        type: 'string',
+        description: 'The ID of the win to delete (from the wins list)',
+      },
+    },
+    required: ['id'],
+  },
+  handler: async (args, context) => {
+    // First, fetch the win to verify it exists and belongs to this user
+    const existing = await db
+      .select()
+      .from(schema.wins)
+      .where(and(eq(schema.wins.id, args.id), eq(schema.wins.userId, context.userId)))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return {
+        success: false,
+        message: 'Win not found or you do not have permission to delete it.',
+      };
+    }
+
+    const win = existing[0];
+    if (!win) {
+      return {
+        success: false,
+        message: 'Win not found.',
+      };
+    }
+
+    // Delete the win
+    await db.delete(schema.wins).where(and(eq(schema.wins.id, args.id), eq(schema.wins.userId, context.userId)));
+
+    return {
+      success: true,
+      message: `Deleted win: "${win.content}"`,
+      deletedContent: win.content,
+    };
+  },
+});
+
+/**
+ * Helper function to parse period string into date range
+ */
+function parsePeriodToDateRange(period: string): { start: Date; end: Date; label: string; dateStr: string } {
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const periodLower = period.toLowerCase().trim();
+
+  if (periodLower === 'today') {
+    const end = new Date(today);
+    end.setDate(end.getDate() + 1);
+    return {
+      start: today,
+      end,
+      label: 'Today',
+      dateStr: today.toISOString().split('T')[0] ?? '',
+    };
+  }
+
+  if (periodLower === 'yesterday') {
+    const start = new Date(today);
+    start.setDate(start.getDate() - 1);
+    return {
+      start,
+      end: today,
+      label: 'Yesterday',
+      dateStr: start.toISOString().split('T')[0] ?? '',
+    };
+  }
+
+  // Try to parse as YYYY-MM-DD
+  const dateMatch = /^\d{4}-\d{2}-\d{2}$/.exec(period);
+  if (dateMatch) {
+    const start = new Date(period + 'T00:00:00');
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+
+    // Generate human-readable label
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dayOfWeek = dayNames[start.getDay()] ?? '';
+    const month = monthNames[start.getMonth()] ?? '';
+    const dayNum = start.getDate();
+
+    return {
+      start,
+      end,
+      label: `${dayOfWeek}, ${month} ${String(dayNum)}`,
+      dateStr: period,
+    };
+  }
+
+  // Default to today if invalid
+  const end = new Date(today);
+  end.setDate(end.getDate() + 1);
+  return {
+    start: today,
+    end,
+    label: 'Today',
+    dateStr: today.toISOString().split('T')[0] ?? '',
+  };
+}
+
+/**
+ * get_wins_by_day tool - Get wins for a specific day
+ */
+export const getWinsByDayTool: ToolDefinition<GetWinsByDayArgs, GetWinsByDayResult> = registerTool({
+  name: 'get_wins_by_day',
+  description:
+    'Get all wins for a specific day with timestamps. Use "today", "yesterday", or a date in YYYY-MM-DD format.',
+  parameters: {
+    type: 'object',
+    properties: {
+      period: {
+        type: 'string',
+        description: 'The day to get wins for: "today", "yesterday", or a specific date in YYYY-MM-DD format',
+      },
+      category: {
+        type: 'string',
+        enum: ['task', 'habit', 'self_care', 'social', 'work', 'creative', 'other'],
+        description: 'Filter by category (optional)',
+      },
+    },
+    required: ['period'],
+  },
+  handler: async (args, context) => {
+    const { start, end, label, dateStr } = parsePeriodToDateRange(args.period);
+
+    // Build where conditions
+    const conditions = [
+      eq(schema.wins.userId, context.userId),
+      gte(schema.wins.createdAt, start),
+      lt(schema.wins.createdAt, end),
+    ];
+
+    if (args.category) {
+      conditions.push(eq(schema.wins.category, args.category));
+    }
+
+    // Get wins for this day
+    const wins = await db
+      .select()
+      .from(schema.wins)
+      .where(and(...conditions))
+      .orderBy(desc(schema.wins.createdAt));
+
+    // Calculate by category
+    const byCategory: Record<string, number> = {};
+    for (const win of wins) {
+      byCategory[win.category] = (byCategory[win.category] ?? 0) + 1;
+    }
+
+    // Format wins with time
+    const formattedWins: WinEntry[] = wins.map((win) => {
+      const time = win.createdAt.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      return {
+        id: win.id,
+        content: win.content,
+        category: win.category,
+        magnitude: win.magnitude,
+        createdAt: win.createdAt.toISOString(),
+        time,
+      };
+    });
+
+    return {
+      date: dateStr,
+      label,
+      totalWins: wins.length,
+      wins: formattedWins,
+      byCategory,
     };
   },
 });
