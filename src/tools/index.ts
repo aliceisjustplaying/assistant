@@ -158,3 +158,4 @@ import './items';
 import './capture';
 import './context';
 import './breakdown';
+import './wins';
