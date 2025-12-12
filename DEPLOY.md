@@ -1,12 +1,12 @@
-# Deploying to Hetzner CX33 with Coolify
+# Deploying to Hetzner VPS
 
-Complete guide to deploy the ADHD Support Agent on a Hetzner CX33 VPS using Coolify.
+Simple deployment using Docker Compose + Caddy + GitHub Actions.
 
 ## Prerequisites
 
 - Hetzner Cloud account
-- Domain name (for HTTPS/webhooks)
-- GitHub account (repo must be accessible)
+- Domain name (for HTTPS)
+- GitHub repo access
 - Telegram bot token (from @BotFather)
 - OpenAI API key (for embeddings)
 
@@ -18,146 +18,108 @@ Complete guide to deploy the ADHD Support Agent on a Hetzner CX33 VPS using Cool
 2. Create new project or select existing
 3. Click **Add Server**
 4. Configure:
-   - **Location**: Falkenstein or Nuremberg (Germany) - cheapest
+   - **Location**: Falkenstein or Nuremberg (cheapest)
    - **Image**: Debian 13
-   - **Type**: CX33 (4 vCPU, 8GB RAM, 80GB) - €5.49/mo
-   - **Networking**: Public IPv4 (default)
+   - **Type**: CX33 (4 vCPU, 8GB RAM) - €5.49/mo
    - **SSH Key**: Add your public key
-   - **Name**: `assistant` or similar
+   - **Name**: `assistant`
 5. Click **Create & Buy Now**
 6. Note the IP address
+
+### Firewall (Optional)
+
+In Hetzner Console → **Firewalls** → **Create Firewall**:
+- TCP 22 (SSH)
+- TCP 80 (HTTP - for Let's Encrypt)
+- TCP 443 (HTTPS)
+
+Apply to your server.
 
 ---
 
 ## Step 2: Point Domain to Server
 
-Add DNS records for your domain:
-
+Add DNS A record:
 ```
-Type  Name              Value           TTL
-A     assistant         YOUR_SERVER_IP  300
-A     *.assistant       YOUR_SERVER_IP  300
+assistant.yourdomain.com → YOUR_SERVER_IP
 ```
 
-Example: `assistant.yourdomain.com` → `YOUR_SERVER_IP`
-
-Wait 5-10 minutes for DNS propagation.
+Wait 5-10 minutes for propagation.
 
 ---
 
-## Step 3: Initial Server Setup
+## Step 3: Server Setup
 
-SSH into your server:
-
+SSH in:
 ```bash
 ssh root@YOUR_SERVER_IP
 ```
 
-Run initial setup:
-
+Update system:
 ```bash
-# Update system
 apt update && apt upgrade -y
-
-# Set timezone (optional)
-timedatectl set-timezone UTC
-
-# Reboot to apply kernel updates
-reboot
 ```
 
-### Firewall (Optional)
-
-Use **Hetzner Cloud Firewall** instead of host-based firewalls:
-
-1. In Hetzner Console → **Firewalls** → **Create Firewall**
-2. Add inbound rules:
-   - TCP 22 (SSH)
-   - TCP 80 (HTTP - for Let's Encrypt)
-   - TCP 443 (HTTPS)
-   - TCP 8000 (Coolify UI - remove after setup)
-3. Apply to your server
-
-This is cleaner than ufw/iptables, which Docker often bypasses anyway.
-
----
-
-## Step 4: Install Coolify
-
-SSH back in after reboot:
-
+Install Docker:
 ```bash
-ssh root@YOUR_SERVER_IP
+apt install -y ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 ```
 
-Install Coolify:
-
+Install mosh and git:
 ```bash
-curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+apt install -y mosh git
 ```
 
-This takes 2-5 minutes. When done, you'll see:
-
+Install GitHub CLI:
+```bash
+(type -p wget >/dev/null || (apt update && apt install wget -y)) && mkdir -p -m 755 /etc/apt/keyrings && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg && cat $out | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && apt update && apt install gh -y
 ```
-Coolify is now running!
-Access it at: http://YOUR_IP:8000
+
+Authenticate with GitHub:
+```bash
+gh auth login
+```
+
+Clone the repo:
+```bash
+mkdir -p /opt
+cd /opt
+gh repo clone YOUR_USERNAME/assistant
+cd assistant
 ```
 
 ---
 
-## Step 5: Configure Coolify
+## Step 4: Configure Environment
 
-1. Open `http://YOUR_SERVER_IP:8000` in your browser
-2. Create admin account (use a strong password)
-3. Complete the setup wizard:
-   - **Instance Settings**: Set your instance name
-   - **SSH Key**: Coolify generates one automatically
-
-### Connect GitHub
-
-1. Go to **Sources** → **Add New**
-2. Select **GitHub App** (recommended) or **Deploy Key**
-3. Follow the OAuth flow to connect your GitHub account
-4. Grant access to your assistant repository
-
----
-
-## Step 6: Create the Application Stack
-
-Your app needs multiple services. In Coolify:
-
-### 6.1 Create New Project
-
-1. Go to **Projects** → **New Project**
-2. Name: `assistant`
-
-### 6.2 Add Docker Compose Resource
-
-1. Inside the project, click **New Resource**
-2. Select **Docker Compose**
-3. Choose **Based on a Git Repository**
-4. Select your repo and branch (`main` or `master`)
-5. Coolify will detect `docker-compose.yml`
-
-### 6.3 Configure Environment Variables
-
-Go to **Environment Variables** and add:
-
-```env
-# Required
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-ANTHROPIC_PROXY_SESSION_SECRET=generate_a_32_char_random_string
-OPENAI_API_KEY=sk-your-openai-key
-TELEGRAM_WEBHOOK_SECRET_TOKEN=generate_another_random_string
-
-# Set after first OAuth login (Step 8)
-ANTHROPIC_PROXY_SESSION_ID=will_set_later
-
-# Webhook URL (use your domain)
+Create `.env` file:
+```bash
+cat > .env << 'EOF'
+# Telegram
+TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_WEBHOOK_URL=https://assistant.yourdomain.com/webhook
+TELEGRAM_WEBHOOK_SECRET_TOKEN=generate_random_string
 
-# Tool webhook (internal Docker network)
+# Anthropic Proxy
+ANTHROPIC_PROXY_SESSION_SECRET=generate_32_char_random_string
+ANTHROPIC_PROXY_SESSION_ID=set_after_oauth
+
+# OpenAI (for embeddings)
+OPENAI_API_KEY=sk-your-key
+
+# Internal
+LETTA_BASE_URL=http://letta:8283
+LITELLM_URL=http://litellm:4000
 TOOL_WEBHOOK_URL=http://app:3000
+EOF
 ```
 
 Generate random strings:
@@ -166,217 +128,314 @@ openssl rand -hex 32  # For SESSION_SECRET
 openssl rand -hex 16  # For WEBHOOK_SECRET_TOKEN
 ```
 
-### 6.4 Configure Domains
+Edit `.env` with your values:
+```bash
+nano .env
+```
 
-1. Go to the **app** service settings
-2. Under **Domains**, add: `assistant.yourdomain.com`
-3. Enable **HTTPS** (Coolify handles Let's Encrypt automatically)
-4. Set port to `3000`
+---
+
+## Step 5: Configure Caddy
+
+Create `Caddyfile`:
+```bash
+cat > Caddyfile << 'EOF'
+assistant.yourdomain.com {
+    reverse_proxy app:3000
+}
+EOF
+```
+
+Replace `assistant.yourdomain.com` with your actual domain.
+
+---
+
+## Step 6: Create Production Compose Override
+
+Create `docker-compose.prod.yml`:
+```bash
+cat > docker-compose.prod.yml << 'EOF'
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    restart: unless-stopped
+
+  letta:
+    restart: unless-stopped
+
+  litellm:
+    restart: unless-stopped
+
+  anthropic-proxy:
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
+EOF
+```
 
 ---
 
 ## Step 7: Deploy
 
-1. Click **Deploy** in Coolify
-2. Watch the build logs
-3. First deploy takes 5-10 minutes (building Rust proxy, pulling images)
-4. Subsequent deploys are much faster (cached layers)
-
-### Verify Services
-
-Once deployed, check health:
-
+Start all services:
 ```bash
-# From your local machine
-curl https://assistant.yourdomain.com/health
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Should return:
-```json
-{"status":"healthy","services":{"letta":"healthy","anthropic_proxy":"healthy"}}
+Check status:
+```bash
+docker compose ps
+docker compose logs -f app
 ```
 
 ---
 
-## Step 8: Anthropic OAuth Setup
+## Step 8: Anthropic OAuth
 
-The anthropic-proxy needs a one-time OAuth login:
+Complete one-time OAuth setup:
 
-1. Open `http://YOUR_SERVER_IP:4001/login` in your browser
-2. Log in with your Anthropic/Claude account
-3. After successful login, you'll see a session ID
-4. Copy the session ID
-5. In Coolify, update the environment variable:
+1. Open SSH tunnel to access the proxy:
+   ```bash
+   # From your local machine
+   ssh -L 4001:localhost:4001 root@YOUR_SERVER_IP
    ```
-   ANTHROPIC_PROXY_SESSION_ID=your_session_id_here
+
+2. Open http://localhost:4001/auth/device in your browser
+
+3. Complete the OAuth flow
+
+4. Copy the session ID and update `.env`:
+   ```bash
+   # On server
+   nano /opt/assistant/.env
+   # Set ANTHROPIC_PROXY_SESSION_ID=your_session_id
    ```
-6. Redeploy the stack
+
+5. Restart:
+   ```bash
+   cd /opt/assistant
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   ```
 
 ---
 
 ## Step 9: Set Telegram Webhook
 
 ```bash
-# Set the webhook URL
-curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://assistant.yourdomain.com/webhook",
     "secret_token": "YOUR_WEBHOOK_SECRET_TOKEN"
   }'
+```
 
-# Verify webhook is set
-curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
+Verify:
+```bash
+curl "https://api.telegram.org/bot<BOT_TOKEN>/getWebhookInfo"
 ```
 
 ---
 
-## Step 10: Test the Bot
+## Step 10: Setup Auto-Deploy
 
-1. Open Telegram
-2. Find your bot (@YourBotName)
-3. Send `/start` or any message
-4. The bot should respond!
+### On Server: Create deploy script
+
+```bash
+cat > /opt/assistant/deploy.sh << 'EOF'
+#!/bin/bash
+cd /opt/assistant
+git pull origin main
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker image prune -f
+EOF
+chmod +x /opt/assistant/deploy.sh
+```
+
+### On Server: Add deploy SSH key
+
+```bash
+# Generate deploy key (no passphrase)
+ssh-keygen -t ed25519 -f ~/.ssh/deploy_key -N ""
+cat ~/.ssh/deploy_key.pub
+# Add this to GitHub repo: Settings → Deploy keys (read-only is fine)
+```
+
+```bash
+cat ~/.ssh/deploy_key
+# Copy the PRIVATE key for GitHub Actions secret
+```
+
+### On GitHub: Add secrets
+
+Go to repo **Settings → Secrets and variables → Actions**, add:
+- `HOST`: Your server IP
+- `SSH_KEY`: The private key from above
+
+### On GitHub: Create workflow
+
+Create `.github/workflows/deploy.yml`:
+```yaml
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: root
+          key: ${{ secrets.SSH_KEY }}
+          script: /opt/assistant/deploy.sh
+```
+
+Now every push to `main` triggers automatic deployment.
 
 ---
 
-## Post-Deployment
+## Verify
 
-### Secure Coolify UI
+Test the bot:
+1. Open Telegram
+2. Message your bot
+3. Should respond!
 
-Once everything works, restrict Coolify UI access:
+Check health:
+```bash
+curl https://assistant.yourdomain.com/health
+```
 
-1. In Hetzner Console → **Firewalls** → Edit your firewall
-2. Remove the TCP 8000 rule
-3. Access Coolify through SSH tunnel instead:
-   ```bash
-   ssh -L 8000:localhost:8000 root@YOUR_SERVER_IP
-   # Then open http://localhost:8000
-   ```
+---
 
-### Enable Auto-Deploy
+## Maintenance
 
-In Coolify, go to your resource and enable **Webhooks**:
-- Push to your repo → automatic redeploy
+### View logs
+```bash
+cd /opt/assistant
+docker compose logs -f           # All services
+docker compose logs -f app       # Just the bot
+docker compose logs -f letta     # Just Letta
+```
 
-### Monitor Resources
+### Restart services
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml restart
+```
 
-Coolify Dashboard shows:
-- CPU/Memory usage per service
-- Container logs
-- Deployment history
+### Manual deploy
+```bash
+/opt/assistant/deploy.sh
+```
 
-### Backups
+### Update SSL cert (automatic)
+Caddy handles Let's Encrypt automatically. No action needed.
 
-1. Go to **Servers** → Your server → **Backup**
-2. Configure automatic backups for:
-   - `letta-data` volume (PostgreSQL)
-   - `./data` directory (SQLite)
+### Backup data
+```bash
+# SQLite database
+cp /opt/assistant/data/assistant.db ~/backup/
+
+# Letta PostgreSQL (if needed)
+docker compose exec letta pg_dump -U letta letta > ~/backup/letta.sql
+```
 
 ---
 
 ## Troubleshooting
 
-### Check Logs
-
-In Coolify UI: Click any service → **Logs**
-
-Or via SSH:
+### Container won't start
 ```bash
-docker logs assistant-app-1 -f
-docker logs assistant-letta-1 -f
-docker logs assistant-litellm-1 -f
+docker compose logs <service>
+docker compose ps -a
 ```
 
-### Service Won't Start
-
+### SSL not working
 ```bash
-# Check all containers
-docker ps -a
-
-# Check specific service logs
-docker compose -f /path/to/compose logs letta
+docker compose logs caddy
+# Ensure ports 80/443 are open in Hetzner firewall
+# Ensure DNS is pointing to your server
 ```
 
-### Webhook Not Working
-
+### Webhook not receiving
 ```bash
-# Test webhook endpoint directly
+# Test manually
 curl -X POST https://assistant.yourdomain.com/webhook \
   -H "Content-Type: application/json" \
   -H "X-Telegram-Bot-Api-Secret-Token: YOUR_SECRET" \
   -d '{"update_id": 1}'
 ```
 
-### Out of Memory
-
-If services are crashing, check memory:
+### Out of memory
 ```bash
 docker stats
 free -h
-```
-
-CX33 has 8GB, which should be plenty. If issues persist, check for memory leaks in logs.
-
-### Reset Everything
-
-Nuclear option - start fresh:
-```bash
-cd /path/to/coolify/project
-docker compose down -v  # Warning: deletes volumes!
-docker compose up -d
+# CX33 has 8GB, should be plenty
 ```
 
 ---
 
-## Cost Summary
+## Cost
 
-| Item | Monthly Cost |
-|------|-------------|
+| Item | Monthly |
+|------|---------|
 | Hetzner CX33 | €5.49 |
-| Domain (optional, if new) | ~€1/mo |
-| Anthropic API | Usage-based |
-| OpenAI API (embeddings) | ~$0.01/mo |
-| **Total** | **~€6.50/mo + API usage** |
+| Domain | ~€1 |
+| APIs | Usage-based |
+| **Total** | **~€6.50 + API** |
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```
 Internet
     │
     ▼
-┌─────────────────────────────────────────────────────┐
-│ Hetzner CX33 (Debian 13 + Docker + Coolify)          │
-│                                                     │
-│  ┌─────────────┐      ┌─────────────────────────┐  │
-│  │ Caddy/Nginx │◄────►│ app (Bun :3000)         │  │
-│  │ (Coolify)   │      │ - Telegram webhook      │  │
-│  │ :443 HTTPS  │      │ - Tool dispatcher       │  │
-│  └─────────────┘      └──────────┬──────────────┘  │
-│                                  │                  │
-│                                  ▼                  │
-│                       ┌─────────────────────────┐  │
-│                       │ letta (:8283)           │  │
-│                       │ - Agent orchestration   │  │
-│                       │ - Memory (PostgreSQL)   │  │
-│                       └──────────┬──────────────┘  │
-│                                  │                  │
-│                                  ▼                  │
-│                       ┌─────────────────────────┐  │
-│                       │ litellm (:4000)         │  │
-│                       │ - OpenAI-compatible API │  │
-│                       └──────────┬──────────────┘  │
-│                                  │                  │
-│                                  ▼                  │
-│  ┌─────────────┐      ┌─────────────────────────┐  │
-│  │auth-adapter │◄────►│ anthropic-proxy (:4001) │  │
-│  │   (:4002)   │      │ - OAuth session mgmt    │  │
-│  └─────────────┘      └──────────┬──────────────┘  │
-│                                  │                  │
-└──────────────────────────────────┼──────────────────┘
-                                   │
-                                   ▼
-                          Anthropic API (Claude)
+┌───────────────────────────────────────┐
+│ Hetzner CX33 (Debian 13 + Docker)     │
+│                                       │
+│  ┌──────────┐    ┌──────────────────┐ │
+│  │ Caddy    │───►│ app (Bun :3000)  │ │
+│  │ :80/:443 │    │ Telegram webhook │ │
+│  │ auto-SSL │    └────────┬─────────┘ │
+│  └──────────┘             │           │
+│                           ▼           │
+│               ┌──────────────────┐    │
+│               │ letta (:8283)    │    │
+│               │ Agent + Memory   │    │
+│               └────────┬─────────┘    │
+│                        │              │
+│                        ▼              │
+│               ┌──────────────────┐    │
+│               │ litellm (:4000)  │    │
+│               └────────┬─────────┘    │
+│                        │              │
+│                        ▼              │
+│               ┌──────────────────┐    │
+│               │anthropic-proxy   │    │
+│               │ (:4001) OAuth    │    │
+│               └────────┬─────────┘    │
+└────────────────────────┼──────────────┘
+                         │
+                         ▼
+                  Anthropic API
 ```
