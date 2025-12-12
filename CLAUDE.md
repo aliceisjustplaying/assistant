@@ -208,6 +208,25 @@ for await (const tool of client.tools.list()) {
 
 ---
 
+## Tiny Wins Tools
+
+The bot includes tools for tracking small accomplishments in `src/tools/wins.ts`:
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `record_tiny_win` | Log an accomplishment | `content` (required), `category`, `magnitude` |
+| `delete_tiny_win` | Remove a mistaken entry | `id` (required) |
+| `get_wins_by_day` | Query wins for a specific day | `period` ("today", "yesterday", "YYYY-MM-DD"), `category` |
+| `get_wins_summary` | Get overview with streaks | `days` (1-30), `category`, `limit` |
+
+**Categories:** `task`, `habit`, `self_care`, `social`, `work`, `creative`, `other`
+
+**Magnitudes:** `tiny`, `small`, `medium`, `big`
+
+**Database:** Wins are stored in the `wins` table with timestamps (`createdAt`).
+
+---
+
 ## Code Quality (MANDATORY)
 
 **CRITICAL**: All code changes MUST pass these checks before completion:
