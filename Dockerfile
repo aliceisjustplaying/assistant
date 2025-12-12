@@ -30,7 +30,7 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./
 
 # Create data directory for SQLite and set ownership for non-root user
-RUN mkdir -p /app/data && chown bun:bun /app/data
+RUN mkdir -p /app/data && chown -R bun:bun /app
 
 # Run as non-root user for security
 USER bun
