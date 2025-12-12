@@ -11,6 +11,53 @@
 import { config } from './config';
 import { db, schema } from './db';
 
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+function extractFirstChoiceContent(data: unknown): string | null {
+  if (typeof data !== 'object' || data === null) {
+    return null;
+  }
+
+  const maybeChoices = (data as { choices?: unknown }).choices;
+  if (!isUnknownArray(maybeChoices) || maybeChoices.length === 0) {
+    return null;
+  }
+
+  const firstChoice = maybeChoices[0];
+  if (typeof firstChoice !== 'object' || firstChoice === null) {
+    return null;
+  }
+
+  const maybeMessage = (firstChoice as { message?: unknown }).message;
+  if (typeof maybeMessage !== 'object' || maybeMessage === null) {
+    return null;
+  }
+
+  const maybeContent = (maybeMessage as { content?: unknown }).content;
+  return typeof maybeContent === 'string' ? maybeContent : null;
+}
+
+function normalizeContent(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function normalizePriority(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 2;
+  }
+
+  // Haiku might return floats; normalize to an int in [0, 4]
+  const rounded = Math.round(value);
+  return Math.min(4, Math.max(0, rounded));
+}
+
 /**
  * Classification result from Haiku
  */
@@ -148,12 +195,8 @@ Be generous with detection - it's better to offer support than miss someone stru
     throw new Error(`Haiku classification failed: ${String(response.status)} ${errorText}`);
   }
 
-  const data = (await response.json()) as {
-    choices: { message: { content: string } }[];
-  };
-
-  const firstChoice = data.choices[0];
-  const content = firstChoice?.message.content ?? '{}';
+  const data = await response.json();
+  const content = extractFirstChoiceContent(data) ?? '{}';
 
   try {
     // Parse the JSON response, handling potential markdown code blocks
@@ -242,12 +285,8 @@ Guidelines:
     throw new Error(`Haiku brain dump parsing failed: ${String(response.status)} ${errorText}`);
   }
 
-  const data = (await response.json()) as {
-    choices: { message: { content: string } }[];
-  };
-
-  const firstChoice = data.choices[0];
-  const content = firstChoice?.message.content ?? '{}';
+  const data = await response.json();
+  const content = extractFirstChoiceContent(data) ?? '{}';
 
   try {
     let jsonStr = content.trim();
@@ -255,18 +294,31 @@ Guidelines:
       jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
 
-    const parsed = JSON.parse(jsonStr) as {
-      tasks?: { content: string; priority?: number }[];
-      ideas?: { content: string }[];
-    };
+    const parsed = JSON.parse(jsonStr) as { tasks?: unknown; ideas?: unknown };
 
-    return {
-      tasks: (parsed.tasks ?? []).map((t) => ({
-        content: t.content,
-        priority: typeof t.priority === 'number' ? t.priority : 2,
-      })),
-      ideas: parsed.ideas ?? [],
-    };
+    const rawTasks = isUnknownArray(parsed.tasks) ? parsed.tasks : [];
+    const rawIdeas = isUnknownArray(parsed.ideas) ? parsed.ideas : [];
+
+    const tasks = rawTasks
+      .map((task) => {
+        const content = normalizeContent((task as { content?: unknown }).content);
+        if (content === null) {
+          return null;
+        }
+
+        const priority = normalizePriority((task as { priority?: unknown }).priority);
+        return { content, priority };
+      })
+      .filter((task): task is { content: string; priority: number } => task !== null);
+
+    const ideas = rawIdeas
+      .map((idea) => {
+        const content = normalizeContent((idea as { content?: unknown }).content);
+        return content === null ? null : { content };
+      })
+      .filter((idea): idea is { content: string } => idea !== null);
+
+    return { tasks, ideas };
   } catch {
     console.warn('Failed to parse brain dump response:', content);
     return { tasks: [], ideas: [] };
@@ -286,6 +338,10 @@ async function saveParsedItems(
 
   // Save tasks
   for (const task of tasks) {
+    if (task.content.trim() === '') {
+      continue;
+    }
+
     const id = crypto.randomUUID();
     await db.insert(schema.items).values({
       id,
@@ -301,6 +357,10 @@ async function saveParsedItems(
 
   // Save ideas as brain_dump items
   for (const idea of ideas) {
+    if (idea.content.trim() === '') {
+      continue;
+    }
+
     const id = crypto.randomUUID();
     await db.insert(schema.items).values({
       id,
@@ -408,6 +468,10 @@ export function formatDetectionContext(result: DetectionResult): string {
   }
   if (result.urgency !== 'low') {
     flags.push(`urgency=${result.urgency}`);
+  }
+
+  if (flags.length === 0 && result.parsed === undefined) {
+    return '';
   }
 
   let context = `[DETECTED: ${flags.join(', ')}]`;
