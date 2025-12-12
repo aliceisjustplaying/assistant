@@ -1,27 +1,19 @@
 model_list:
   # Claude Opus 4.5 - main conversational agent
-  # Connects directly to anthropic-proxy with custom headers
-  # Note: os.environ/ works in extra_headers per LiteLLM docs ("ANY value")
-  # and source code (_check_for_os_environ_vars recursively processes dicts)
+  # Routes through auth-adapter -> anthropic-proxy for OAuth-based auth
   - model_name: claude-opus-4-5-20251101
     litellm_params:
       model: anthropic/claude-opus-4-5-20251101
-      api_base: http://anthropic-proxy:4001
-      api_key: "unused"
-      extra_headers:
-        x-api-key: os.environ/ANTHROPIC_PROXY_SESSION_ID
-        Accept-Encoding: identity
+      api_base: http://auth-adapter:4002
+      api_key: os.environ/ANTHROPIC_PROXY_SESSION_ID
 
   # Claude Haiku 4.5 - fast detection/classification
   # Used for overwhelm, brain dump, and self-bullying detection
   - model_name: claude-haiku-4-5-20251001
     litellm_params:
       model: anthropic/claude-haiku-4-5-20251001
-      api_base: http://anthropic-proxy:4001
-      api_key: "unused"
-      extra_headers:
-        x-api-key: os.environ/ANTHROPIC_PROXY_SESSION_ID
-        Accept-Encoding: identity
+      api_base: http://auth-adapter:4002
+      api_key: os.environ/ANTHROPIC_PROXY_SESSION_ID
 
 litellm_settings:
   drop_params: true
