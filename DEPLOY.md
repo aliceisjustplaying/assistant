@@ -62,16 +62,23 @@ apt update && apt upgrade -y
 # Set timezone (optional)
 timedatectl set-timezone UTC
 
-# Enable firewall
-ufw allow 22/tcp   # SSH
-ufw allow 80/tcp   # HTTP (for SSL verification)
-ufw allow 443/tcp  # HTTPS
-ufw allow 8000/tcp # Coolify UI (temporary, remove later)
-ufw --force enable
-
 # Reboot to apply kernel updates
 reboot
 ```
+
+### Firewall (Optional)
+
+Use **Hetzner Cloud Firewall** instead of host-based firewalls:
+
+1. In Hetzner Console → **Firewalls** → **Create Firewall**
+2. Add inbound rules:
+   - TCP 22 (SSH)
+   - TCP 80 (HTTP - for Let's Encrypt)
+   - TCP 443 (HTTPS)
+   - TCP 8000 (Coolify UI - remove after setup)
+3. Apply to your server
+
+This is cleaner than ufw/iptables, which Docker often bypasses anyway.
 
 ---
 
@@ -239,14 +246,13 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
 
 Once everything works, restrict Coolify UI access:
 
-```bash
-# Remove public access to Coolify
-ufw delete allow 8000/tcp
-
-# Access Coolify through SSH tunnel instead:
-# ssh -L 8000:localhost:8000 root@YOUR_SERVER_IP
-# Then open http://localhost:8000
-```
+1. In Hetzner Console → **Firewalls** → Edit your firewall
+2. Remove the TCP 8000 rule
+3. Access Coolify through SSH tunnel instead:
+   ```bash
+   ssh -L 8000:localhost:8000 root@YOUR_SERVER_IP
+   # Then open http://localhost:8000
+   ```
 
 ### Enable Auto-Deploy
 
