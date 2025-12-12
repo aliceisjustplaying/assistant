@@ -19,7 +19,7 @@ Complete guide to deploy the ADHD Support Agent on a Hetzner CX33 VPS using Cool
 3. Click **Add Server**
 4. Configure:
    - **Location**: Falkenstein or Nuremberg (Germany) - cheapest
-   - **Image**: Ubuntu 24.04
+   - **Image**: Debian 13
    - **Type**: CX33 (4 vCPU, 8GB RAM, 80GB) - €5.49/mo
    - **Networking**: Public IPv4 (default)
    - **SSH Key**: Add your public key
@@ -342,7 +342,7 @@ Internet
     │
     ▼
 ┌─────────────────────────────────────────────────────┐
-│ Hetzner CX33 (Ubuntu + Docker + Coolify)            │
+│ Hetzner CX33 (Debian 13 + Docker + Coolify)          │
 │                                                     │
 │  ┌─────────────┐      ┌─────────────────────────┐  │
 │  │ Caddy/Nginx │◄────►│ app (Bun :3000)         │  │
