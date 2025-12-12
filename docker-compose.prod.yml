@@ -1,0 +1,53 @@
+# Production overrides for docker-compose.yml
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# This config adds Caddy reverse proxy with auto-SSL (Let's Encrypt)
+# Note: Internal service ports are still exposed but should be blocked by firewall
+# Only ports 80/443 should be open in Hetzner Cloud Firewall
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - assistant-net
+    depends_on:
+      - app
+
+  # Netdata: Real-time monitoring
+  # Access via https://netdata.assistant.mosphere.at (basic auth protected)
+  netdata:
+    image: netdata/netdata
+    restart: unless-stopped
+    hostname: assistant
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdata_config:/etc/netdata
+      - netdata_lib:/var/lib/netdata
+      - netdata_cache:/var/cache/netdata
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN:-}
+      - NETDATA_CLAIM_URL=https://app.netdata.cloud
+    networks:
+      - assistant-net
+
+volumes:
+  caddy_data:
+  caddy_config:
+  netdata_config:
+  netdata_lib:
+  netdata_cache:
