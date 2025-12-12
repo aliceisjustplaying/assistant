@@ -26,6 +26,41 @@ let agentId: string | null = null;
 const AGENT_NAME = 'adhd-support-agent';
 
 /**
+ * Sync any missing tools to an existing agent
+ *
+ * Compares registered tools with agent's attached tools and attaches any missing ones.
+ */
+async function syncToolsToAgent(client: ReturnType<typeof getLettaClient>, agentId: string): Promise<void> {
+  const registeredToolIds = getRegisteredToolIds();
+  if (registeredToolIds.length === 0) {
+    return;
+  }
+
+  // Get currently attached tools
+  const attachedTools = new Set<string>();
+  for await (const tool of client.agents.tools.list(agentId)) {
+    attachedTools.add(tool.id);
+  }
+
+  // Attach any missing tools
+  let attached = 0;
+  for (const toolId of registeredToolIds) {
+    if (!attachedTools.has(toolId)) {
+      try {
+        await client.agents.tools.attach(toolId, { agent_id: agentId });
+        attached++;
+      } catch (err) {
+        console.warn(`Failed to attach tool ${toolId}:`, err);
+      }
+    }
+  }
+
+  if (attached > 0) {
+    console.log(`Attached ${String(attached)} new tools to existing agent`);
+  }
+}
+
+/**
  * Get or create the single ADHD support agent
  *
  * Searches for existing agent by name, creates if not found.
@@ -47,6 +82,10 @@ async function getOrCreateAgent(): Promise<string> {
       if (agent.name === AGENT_NAME) {
         console.log(`Found existing agent: ${agent.id}`);
         agentId = agent.id;
+
+        // Sync any missing tools to the existing agent
+        await syncToolsToAgent(client, agentId);
+
         return agentId;
       }
     }
@@ -142,9 +181,23 @@ async function sendMessageToAgent(agentId: string, message: string): Promise<str
     const msgPreview = message.slice(0, 100) + (message.length > 100 ? '...' : '');
     console.log(`\n📤 Sending message to agent ${agentId}: "${msgPreview}"`);
 
+    // Inject current date/time so the assistant has a sense of time
+    const now = new Date();
+    const timestamp = now.toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short',
+    });
+    const messageWithTime = `[${timestamp}]\n${message}`;
+
     // Send message to agent (non-streaming mode for simplicity in M1)
     const response = await client.agents.messages.create(agentId, {
-      input: message,
+      input: messageWithTime,
       streaming: false,
     });
 
@@ -323,8 +376,13 @@ bot.on('message', async (ctx: Context) => {
     // Send message to agent and get response
     const response = await sendMessageToAgent(currentAgentId, messageText);
 
-    // Reply to user
-    await ctx.reply(response);
+    // Reply to user with Markdown formatting (fallback to plain text if parsing fails)
+    try {
+      await ctx.reply(response, { parse_mode: 'Markdown' });
+    } catch {
+      // Markdown parsing failed, send as plain text
+      await ctx.reply(response);
+    }
   } catch (err: unknown) {
     console.error('Error handling message:', err);
 
@@ -382,8 +440,11 @@ export async function startPolling(): Promise<void> {
 // Handle Bun hot reload - stop bot before module replacement
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, @typescript-eslint/strict-boolean-expressions -- import.meta.hot is undefined when not in hot mode
 if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
+  import.meta.hot.dispose(async () => {
     console.log('Hot reload: stopping bot...');
     bot.stop('HOT_RELOAD');
+    // bot.stop() is sync but Telegram needs time to release the connection
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    console.log('Hot reload: bot stopped');
   });
 }
