@@ -3,7 +3,7 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 # Copy package files first for better caching
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 
 # Install all dependencies (including dev for build)
 RUN bun install --frozen-lockfile
@@ -20,7 +20,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 
 # Install production dependencies only
 RUN bun install --frozen-lockfile --production
