@@ -329,51 +329,57 @@ Guidelines:
 /**
  * Save parsed brain dump items to database
  */
-async function saveParsedItems(
+function saveParsedItems(
   userId: number,
   tasks: { content: string; priority: number }[],
   ideas: { content: string }[]
-): Promise<{ taskIds: string[]; ideaIds: string[] }> {
+): { taskIds: string[]; ideaIds: string[] } {
   const taskIds: string[] = [];
   const ideaIds: string[] = [];
 
-  // Save tasks
-  for (const task of tasks) {
-    if (task.content.trim() === '') {
-      continue;
+  db.transaction((tx) => {
+    // Save tasks
+    for (const task of tasks) {
+      if (task.content.trim() === '') {
+        continue;
+      }
+
+      const id = crypto.randomUUID();
+      tx.insert(schema.items)
+        .values({
+          id,
+          userId,
+          type: 'task',
+          content: task.content,
+          status: 'open',
+          priority: task.priority,
+          parentId: null,
+        })
+        .run();
+      taskIds.push(id);
     }
 
-    const id = crypto.randomUUID();
-    await db.insert(schema.items).values({
-      id,
-      userId,
-      type: 'task',
-      content: task.content,
-      status: 'open',
-      priority: task.priority,
-      parentId: null,
-    });
-    taskIds.push(id);
-  }
+    // Save ideas as brain_dump items
+    for (const idea of ideas) {
+      if (idea.content.trim() === '') {
+        continue;
+      }
 
-  // Save ideas as brain_dump items
-  for (const idea of ideas) {
-    if (idea.content.trim() === '') {
-      continue;
+      const id = crypto.randomUUID();
+      tx.insert(schema.items)
+        .values({
+          id,
+          userId,
+          type: 'brain_dump',
+          content: idea.content,
+          status: 'open',
+          priority: 3, // Low priority for ideas
+          parentId: null,
+        })
+        .run();
+      ideaIds.push(id);
     }
-
-    const id = crypto.randomUUID();
-    await db.insert(schema.items).values({
-      id,
-      userId,
-      type: 'brain_dump',
-      content: idea.content,
-      status: 'open',
-      priority: 3, // Low priority for ideas
-      parentId: null,
-    });
-    ideaIds.push(id);
-  }
+  });
 
   return { taskIds, ideaIds };
 }
@@ -443,7 +449,7 @@ export async function detectAndParse(text: string, userId: number | null): Promi
 
         if (saveUserId !== null) {
           try {
-            const { taskIds, ideaIds } = await saveParsedItems(saveUserId, tasks, ideas);
+            const { taskIds, ideaIds } = saveParsedItems(saveUserId, tasks, ideas);
 
             result.parsed = {
               tasks,
