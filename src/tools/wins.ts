@@ -314,26 +314,32 @@ function parsePeriodToDateRange(period: string): { start: Date; end: Date; label
     };
   }
 
-  // Try to parse as YYYY-MM-DD
-  const dateMatch = /^\d{4}-\d{2}-\d{2}$/.exec(period);
+  // Try to parse as YYYY-MM-DD (use periodLower for consistent whitespace handling)
+  const dateMatch = /^\d{4}-\d{2}-\d{2}$/.exec(periodLower);
   if (dateMatch) {
-    const start = new Date(period + 'T00:00:00');
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
+    const start = new Date(periodLower + 'T00:00:00');
 
-    // Generate human-readable label
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dayOfWeek = dayNames[start.getDay()] ?? '';
-    const month = monthNames[start.getMonth()] ?? '';
-    const dayNum = start.getDate();
+    // Validate the date is actually valid (e.g., reject "2024-13-45")
+    if (isNaN(start.getTime())) {
+      // Invalid date, fall through to default (today)
+    } else {
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
 
-    return {
-      start,
-      end,
-      label: `${dayOfWeek}, ${month} ${String(dayNum)}`,
-      dateStr: period,
-    };
+      // Generate human-readable label
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const dayOfWeek = dayNames[start.getDay()] ?? '';
+      const month = monthNames[start.getMonth()] ?? '';
+      const dayNum = start.getDate();
+
+      return {
+        start,
+        end,
+        label: `${dayOfWeek}, ${month} ${String(dayNum)}`,
+        dateStr: periodLower,
+      };
+    }
   }
 
   // Default to today if invalid
