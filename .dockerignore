@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Data (mounted as volume)
+data/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Tests
+*.test.ts
+**/*.test.ts
+coverage/
+
+# Documentation
+*.md
+!README.md
+docs/
+history/
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Other Dockerfiles (not needed in context)
+Dockerfile.*
+docker-compose*.yml
