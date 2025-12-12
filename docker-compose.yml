@@ -108,6 +108,8 @@ services:
       - ANTHROPIC_PROXY_URL=http://anthropic-proxy:4001/v1
       - ANTHROPIC_PROXY_SESSION_ID=${ANTHROPIC_PROXY_SESSION_ID}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Tool webhook URL - Letta calls back to app via Docker network
+      - TOOL_WEBHOOK_URL=http://app:3000
     volumes:
       - ./data:/app/data
     networks:
