@@ -7,14 +7,16 @@ A Telegram bot that helps with ADHD task management, brain dumps, and gentle acc
 ```
 Telegram Bot (Bun)
        │
-       ├──► Haiku 4.5 Detection ──► LiteLLM ──► Anthropic API
+       ├──► Haiku 4.5 Detection ──► LiteLLM ──► auth-adapter ──► anthropic-proxy ──► Anthropic API
        │    (overwhelm, brain dump, self-bullying)
        │
        ▼
 Letta (port 8283) - AI agent framework
        ↓ OpenAI-compatible API
 LiteLLM (port 4000) - API translation layer
-       ↓ Anthropic API format (x-api-key via extra_headers)
+       ↓
+auth-adapter (port 4002) - Bearer → x-api-key header translation
+       ↓
 anthropic-proxy (port 4001) - OAuth session management
        ↓
 Anthropic API (Claude Opus 4.5)
@@ -24,6 +26,7 @@ Anthropic API (Claude Opus 4.5)
 - **Haiku 4.5 Detection**: Fast classification of user messages for overwhelm, brain dumps, and self-bullying
 - **Letta**: AI agent framework with persistent memory (uses Opus 4.5)
 - **LiteLLM**: Translates OpenAI-compatible requests to Anthropic format
+- **auth-adapter**: Translates Bearer tokens to x-api-key headers for anthropic-proxy
 - **anthropic-proxy**: OAuth proxy for Anthropic API access
 - **SQLite**: Local storage for items, wins, and context
 
