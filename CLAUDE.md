@@ -108,13 +108,28 @@ For example: `bd create --help` shows `--parent`, `--deps`, `--assignee`, etc.
 
 ---
 
-## Claude Model
+## Claude Models
 
-**Always use Claude Opus 4.5** for this project:
+This project uses **two Claude models**:
+
+### Opus 4.5 (Main Agent)
 - Model ID: `claude-opus-4-5-20251101`
 - Letta handle: `openai/claude-opus-4-5-20251101` (via LiteLLM proxy)
+- Used for: Main conversational agent, tool execution, user interactions
 
-Do NOT use other Claude models (sonnet, haiku, etc.) unless explicitly requested.
+### Haiku 4.5 (Detection)
+- Model ID: `claude-haiku-4-5-20251001`
+- Config: `HAIKU_MODEL` environment variable
+- Used for: Fast classification of user messages (overwhelm, brain dump, self-bullying)
+- Called via LiteLLM at `LITELLM_URL`
+
+The detection flow in `src/detect.ts`:
+1. Regex pre-filter triggers Haiku only when patterns detected
+2. Haiku classifies: `overwhelm`, `brainDump`, `selfBullying`, `urgency`
+3. If brain dump detected, Haiku parses and saves tasks/ideas to DB
+4. Detection context prepended to message for Opus to respond appropriately
+
+Do NOT use Sonnet unless explicitly requested.
 
 ### Letta Agent Creation Workaround
 
