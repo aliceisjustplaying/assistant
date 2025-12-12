@@ -273,6 +273,16 @@ export const deleteTinyWinTool: ToolDefinition<DeleteTinyWinArgs, DeleteTinyWinR
 });
 
 /**
+ * Helper function to format a date as YYYY-MM-DD in local timezone
+ */
+function formatLocalDate(date: Date): string {
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Helper function to parse period string into date range
  */
 function parsePeriodToDateRange(period: string): { start: Date; end: Date; label: string; dateStr: string } {
@@ -289,7 +299,7 @@ function parsePeriodToDateRange(period: string): { start: Date; end: Date; label
       start: today,
       end,
       label: 'Today',
-      dateStr: today.toISOString().split('T')[0] ?? '',
+      dateStr: formatLocalDate(today),
     };
   }
 
@@ -300,7 +310,7 @@ function parsePeriodToDateRange(period: string): { start: Date; end: Date; label
       start,
       end: today,
       label: 'Yesterday',
-      dateStr: start.toISOString().split('T')[0] ?? '',
+      dateStr: formatLocalDate(start),
     };
   }
 
@@ -333,7 +343,7 @@ function parsePeriodToDateRange(period: string): { start: Date; end: Date; label
     start: today,
     end,
     label: 'Today',
-    dateStr: today.toISOString().split('T')[0] ?? '',
+    dateStr: formatLocalDate(today),
   };
 }
 
