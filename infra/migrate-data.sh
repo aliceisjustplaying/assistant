@@ -152,12 +152,11 @@ async function main() {
     apiKey: process.env.LETTA_SERVER_PASSWORD || undefined,
   });
 
-  // Check if agent already exists
+  // Delete any existing agents with this name (including _copy variants)
   for await (const agent of client.agents.list()) {
-    if (agent.name === AGENT_NAME) {
-      console.log(`Agent '${AGENT_NAME}' already exists (${agent.id}), deleting...`);
+    if (agent.name === AGENT_NAME || agent.name === `${AGENT_NAME}_copy`) {
+      console.log(`Deleting existing agent '${agent.name}' (${agent.id})...`);
       await client.agents.delete(agent.id);
-      break;
     }
   }
 
@@ -167,7 +166,7 @@ async function main() {
   // Create a Blob for the file upload
   const file = new Blob([fileData], { type: 'application/json' });
 
-  const imported = await client.agents.importFile({ file });
+  const imported = await client.agents.importFile({ file, append_copy_suffix: false });
   console.log(`Imported agent IDs: ${imported.agent_ids.join(', ')}`);
 }
 
