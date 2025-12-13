@@ -451,6 +451,25 @@ EOF
 }
 
 #######################################
+# Upload system prompt
+#######################################
+upload_system_prompt() {
+  log_info "Uploading system prompt..."
+
+  local prompt_file="$SCRIPT_DIR/../prompts/SYSTEM_PROMPT.md"
+
+  if [[ ! -f "$prompt_file" ]]; then
+    log_warn "System prompt not found: $prompt_file"
+    log_warn "Create it from the example: cp prompts/SYSTEM_PROMPT.md.example prompts/SYSTEM_PROMPT.md"
+    return
+  fi
+
+  ssh -T -o StrictHostKeyChecking=no "root@$SERVER_IP" "mkdir -p /opt/assistant/prompts"
+  scp -o StrictHostKeyChecking=no "$prompt_file" "root@$SERVER_IP:/opt/assistant/prompts/SYSTEM_PROMPT.md"
+  log_success "System prompt uploaded"
+}
+
+#######################################
 # Start services
 #######################################
 start_services() {
@@ -639,6 +658,7 @@ main() {
   get_tailscale_ip
   upload_env_file
   upload_caddyfile
+  upload_system_prompt
   start_services
   wait_for_health
   set_telegram_webhook
