@@ -49,3 +49,6 @@ infra/deploy_key_*
 
 # Environment backups (created by deploy.sh)
 .env.backup.*
+
+# Agent export files (created by migrate-data.sh)
+infra/agent_export.af
