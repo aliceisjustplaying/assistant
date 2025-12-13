@@ -65,6 +65,7 @@ export_letta_agent() {
   cd "$PROJECT_DIR"
   bun run --silent - << 'TYPESCRIPT'
 import { Letta } from '@letta-ai/letta-client';
+import { writeFileSync } from 'fs';
 
 const AGENT_NAME = 'adhd-support-agent';
 
@@ -90,12 +91,11 @@ async function main() {
 
   console.log(`Found agent: ${agentId}`);
 
-  // Export agent to .af file
-  const exported = await client.agents.exportAgentSerialized(agentId);
+  // Export agent to .af file (JSON format)
+  const exported = await client.agents.exportFile(agentId);
 
-  // Write to file
-  const fs = await import('fs');
-  fs.writeFileSync('infra/agent_export.af', Buffer.from(exported));
+  // Write to file as JSON
+  writeFileSync('infra/agent_export.af', JSON.stringify(exported));
 
   console.log('Agent exported to infra/agent_export.af');
 }
@@ -128,8 +128,9 @@ import_letta_agent() {
     return
   fi
 
-  # Copy export file to server
-  scp "$export_file" "$SERVER_HOST:/tmp/agent_export.af"
+  # Copy export file to server's data directory (mounted in container)
+  scp "$export_file" "$SERVER_HOST:/opt/assistant/data/agent_export.af"
+  ssh "$SERVER_HOST" "chown 1000:1000 /opt/assistant/data/agent_export.af"
 
   # Run import on server
   ssh "$SERVER_HOST" << 'EOF'
@@ -160,13 +161,14 @@ async function main() {
     }
   }
 
-  // Import agent from .af file
-  const fileData = readFileSync('/tmp/agent_export.af');
-  const blob = new Blob([fileData]);
+  // Import agent from .af file (in mounted data directory)
+  const fileData = readFileSync('/app/data/agent_export.af');
 
-  const imported = await client.agents.importAgentSerialized(blob, {});
-  console.log(`Agent imported: ${imported.id}`);
-  console.log(`Name: ${imported.name}`);
+  // Create a Blob for the file upload
+  const file = new Blob([fileData], { type: 'application/json' });
+
+  const imported = await client.agents.importFile({ file });
+  console.log(`Imported agent IDs: ${imported.agent_ids.join(', ')}`);
 }
 
 main().catch(err => {
@@ -177,7 +179,7 @@ TYPESCRIPT
 EOF
 
   # Cleanup
-  ssh "$SERVER_HOST" "rm -f /tmp/agent_export.af"
+  ssh "$SERVER_HOST" "rm -f /opt/assistant/data/agent_export.af"
   rm -f "$export_file"
 
   log_success "Agent imported to production"
