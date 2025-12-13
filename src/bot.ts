@@ -411,6 +411,28 @@ export async function handleUpdate(update: Update): Promise<void> {
 }
 
 /**
+ * Register webhook with Telegram
+ *
+ * Called on startup when webhook mode is enabled.
+ * Ensures the webhook is properly configured with the secret token.
+ */
+export async function registerWebhook(): Promise<void> {
+  console.log(`Registering webhook: ${config.TELEGRAM_WEBHOOK_URL}`);
+
+  await bot.telegram.setWebhook(config.TELEGRAM_WEBHOOK_URL, {
+    secret_token: config.TELEGRAM_WEBHOOK_SECRET_TOKEN,
+  });
+
+  // Verify registration
+  const info = await bot.telegram.getWebhookInfo();
+  console.log(`Webhook registered: ${info.url ?? '(no url)'}`);
+
+  if (info.last_error_message !== undefined && info.last_error_message !== '') {
+    console.warn(`Webhook last error: ${info.last_error_message}`);
+  }
+}
+
+/**
  * Start polling mode (for development)
  *
  * Only used when TELEGRAM_WEBHOOK_URL is empty.

@@ -12,7 +12,7 @@
 import { config, isWebhookMode } from './config';
 import { healthCheck, simpleHealthCheck } from './health';
 import { initializeLetta } from './letta';
-import { handleUpdate, startPolling } from './bot';
+import { handleUpdate, startPolling, registerWebhook } from './bot';
 import { dispatchTool } from './tools';
 import type { Update } from 'telegraf/types';
 
@@ -141,7 +141,12 @@ async function main(): Promise<void> {
 
   // Start bot in appropriate mode
   if (isWebhookMode()) {
-    console.log(`Webhook mode enabled: ${config.TELEGRAM_WEBHOOK_URL}`);
+    try {
+      await registerWebhook();
+    } catch (error) {
+      console.error('Failed to register webhook:', error);
+      console.error('Bot will not receive messages until webhook is registered.');
+    }
   } else {
     console.log('Webhook mode disabled, starting polling for development...');
     try {
