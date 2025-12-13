@@ -76,7 +76,7 @@ async function syncToolsToAgent(client: ReturnType<typeof getLettaClient>, agent
  *
  * @returns Agent ID
  */
-async function getOrCreateAgent(): Promise<string> {
+export async function getOrCreateAgent(): Promise<string> {
   if (agentId !== null) {
     return agentId;
   }
