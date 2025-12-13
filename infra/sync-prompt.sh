@@ -37,8 +37,9 @@ fi
 
 log_info "Syncing system prompt to $SERVER_IP..."
 
-# Upload prompt
+# Upload prompt and fix permissions (container runs as bun user, UID 1000)
 scp -o StrictHostKeyChecking=no "$PROMPT_FILE" "root@$SERVER_IP:/opt/assistant/prompts/SYSTEM_PROMPT.md"
+ssh -o StrictHostKeyChecking=no "root@$SERVER_IP" "chown 1000:1000 /opt/assistant/prompts/SYSTEM_PROMPT.md"
 log_success "Prompt uploaded"
 
 # Restart app container only (fast, no rebuild)

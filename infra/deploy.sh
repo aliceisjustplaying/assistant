@@ -466,6 +466,7 @@ upload_system_prompt() {
 
   ssh -T -o StrictHostKeyChecking=no "root@$SERVER_IP" "mkdir -p /opt/assistant/prompts"
   scp -o StrictHostKeyChecking=no "$prompt_file" "root@$SERVER_IP:/opt/assistant/prompts/SYSTEM_PROMPT.md"
+  ssh -T -o StrictHostKeyChecking=no "root@$SERVER_IP" "chown -R 1000:1000 /opt/assistant/prompts"
   log_success "System prompt uploaded"
 }
 
