@@ -29,6 +29,15 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 die() { log_error "$1"; exit 1; }
 
 #######################################
+# Stop app container
+#######################################
+stop_app() {
+  log_info "Stopping app container..."
+  ssh "$SERVER_HOST" "cd /opt/assistant && docker compose -f docker-compose.yml -f docker-compose.prod.yml stop app"
+  log_success "App stopped"
+}
+
+#######################################
 # Sync SQLite database
 #######################################
 sync_sqlite() {
@@ -45,6 +54,9 @@ sync_sqlite() {
   if command -v sqlite3 &> /dev/null; then
     sqlite3 "$db_file" "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || true
   fi
+
+  # Remove remote WAL/SHM files to prevent stale data
+  ssh "$SERVER_HOST" "rm -f /opt/assistant/data/assistant.db-wal /opt/assistant/data/assistant.db-shm"
 
   # Copy to server
   scp "$db_file" "$SERVER_HOST:/opt/assistant/data/assistant.db"
@@ -207,13 +219,16 @@ main() {
     die "Cannot connect to $SERVER_HOST"
   fi
 
+  # Stop app to safely copy SQLite database
+  stop_app
   sync_sqlite
+
+  # Start app for Letta import (needs the app container running)
+  restart_app
 
   if export_letta_agent; then
     import_letta_agent
   fi
-
-  restart_app
 
   echo
   log_success "Migration complete!"
