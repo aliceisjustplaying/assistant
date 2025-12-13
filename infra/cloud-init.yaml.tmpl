@@ -44,6 +44,7 @@ runcmd:
   - mkdir -p /opt
   - git clone https://github.com/__GH_REPO__.git /opt/assistant
   - chmod +x /opt/assistant/deploy.sh
+  - chown -R 1000:1000 /opt/assistant/data  # bun user in container
 
   # Generate deploy key for GitHub Actions
   - ssh-keygen -t ed25519 -f /root/.ssh/deploy_key -N "" -C "deploy@assistant"
