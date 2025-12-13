@@ -4,12 +4,13 @@ networks:
 
 services:
   # anthropic-proxy: OAuth proxy for Anthropic API
+  # Internal only - accessed by auth-adapter via Docker network
+  # For OAuth setup, use SSH tunnel: ssh -L 4001:localhost:4001 root@SERVER
   anthropic-proxy:
     build:
       context: .
       dockerfile: Dockerfile.anthropic-proxy
-    ports:
-      - '4001:4001'
+    # No external port exposure - internal Docker network only
     environment:
       - PORT=4001
       - SESSION_SECRET=${ANTHROPIC_PROXY_SESSION_SECRET}
@@ -32,12 +33,12 @@ services:
 
   # Auth adapter: translates Bearer tokens to x-api-key headers
   # LiteLLM's os.environ/ substitution doesn't work in extra_headers
+  # Internal only - accessed by LiteLLM via Docker network
   auth-adapter:
     image: oven/bun:latest
     working_dir: /app
     command: ['bun', 'run', 'src/auth-adapter.ts']
-    ports:
-      - '4002:4002'
+    # No external port exposure - internal Docker network only
     environment:
       - ANTHROPIC_PROXY_INTERNAL_URL=http://anthropic-proxy:4001
       - AUTH_ADAPTER_PORT=4002
@@ -58,12 +59,12 @@ services:
       retries: 3
 
   # LiteLLM: OpenAI-compatible API that proxies to auth-adapter -> anthropic-proxy
+  # Internal only - accessed by Letta and app via Docker network
   litellm:
     # Using specific version that includes fix for tools=None bug
     # https://github.com/BerriAI/litellm/commit/7c2e2111c0cc3372ca0ce911d0b6d45c22794d7f
     image: ghcr.io/berriai/litellm:litellm_embedding_header_forwarding-v1.80.9.dev6
-    ports:
-      - '4000:4000'
+    # No external port exposure - internal Docker network only
     env_file: .env
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro

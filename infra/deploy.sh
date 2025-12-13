@@ -442,7 +442,7 @@ ${fqdn} {
 # Netdata and Letta are accessed via Tailscale only
 # http://TAILSCALE_IP:19999 - Netdata
 # http://TAILSCALE_IP:8283  - Letta
-# http://TAILSCALE_IP:4001  - Anthropic Proxy (for OAuth setup)
+# Anthropic Proxy: internal only, use SSH tunnel for OAuth setup
 EOF
 
   log_info "Uploading Caddyfile..."
@@ -602,18 +602,16 @@ print_summary() {
   if [[ -n "${TAILSCALE_IP:-}" ]]; then
     echo "  Letta (Tailscale):      http://${TAILSCALE_IP}:8283"
     echo "  Netdata (Tailscale):    http://${TAILSCALE_IP}:19999"
-    echo "  OAuth setup (Tailscale): http://${TAILSCALE_IP}:4001/auth/device"
   fi
+  echo "  OAuth setup (SSH tunnel): ssh -L 4001:localhost:4001 root@$SERVER_IP"
   echo
   echo -e "${YELLOW}NEXT STEP: Complete Anthropic OAuth${NC}"
-  echo "  Open this URL from any device on your Tailscale network:"
-  if [[ -n "${TAILSCALE_IP:-}" ]]; then
-    echo "    http://${TAILSCALE_IP}:4001/auth/device"
-  else
-    echo "    http://<TAILSCALE_IP>:4001/auth/device"
-  fi
+  echo "  The OAuth endpoint is internal-only. Use SSH tunnel to access it:"
   echo
-  echo "  After completing OAuth, copy the session ID and run:"
+  echo "    ssh -L 4001:localhost:4001 root@$SERVER_IP"
+  echo "    # Then open in browser: http://localhost:4001/auth/device"
+  echo
+  echo "  After completing OAuth, copy the session ID and update .env:"
   echo "    ssh root@$SERVER_IP"
   echo "    nano /opt/assistant/.env"
   echo "    # Set ANTHROPIC_PROXY_SESSION_ID=your_session_id"
