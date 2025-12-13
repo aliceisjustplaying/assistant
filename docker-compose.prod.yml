@@ -19,6 +19,7 @@ services:
       - TOOL_WEBHOOK_URL=http://app:3000
     volumes:
       - ./data:/app/data
+      - ./prompts:/app/prompts:ro
     networks:
       - assistant-net
     restart: unless-stopped
