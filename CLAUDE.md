@@ -221,6 +221,26 @@ for await (const tool of client.tools.list()) {
 // Then update if exists, create if not
 ```
 
+### LiteLLM tools=None Bug (Pinned Version)
+
+LiteLLM's `main-latest` image has a bug where `filter_web_search_deployments` throws a `TypeError` when Letta sends `tools=null` during summarization requests.
+
+**Symptom:** Agent crashes during memory compaction/summarization with:
+```
+TypeError: argument of type 'NoneType' is not iterable
+```
+
+**Fix:** Pin to version `v1.80.9.dev6` which includes the fix:
+```yaml
+# docker-compose.yml
+litellm:
+  # Using specific version that includes fix for tools=None bug
+  # https://github.com/BerriAI/litellm/commit/7c2e2111c0cc3372ca0ce911d0b6d45c22794d7f
+  image: ghcr.io/berriai/litellm:litellm_embedding_header_forwarding-v1.80.9.dev6
+```
+
+**When to update:** Once LiteLLM releases a stable version with this fix merged, update to that version.
+
 ---
 
 ## Tiny Wins Tools
