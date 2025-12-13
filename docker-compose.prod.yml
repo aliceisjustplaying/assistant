@@ -71,6 +71,7 @@ services:
     env_file: .env
     environment:
       - NETDATA_CLAIM_URL=https://app.netdata.cloud
+      - NETDATA_DISABLE_CLOUD=1
     networks:
       - assistant-net
 
