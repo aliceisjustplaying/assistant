@@ -411,6 +411,28 @@ export async function handleUpdate(update: Update): Promise<void> {
 }
 
 /**
+ * Register bot commands with Telegram
+ *
+ * Sets the command menu that appears in the Telegram UI.
+ * Called on startup to keep BotFather commands in sync with code.
+ *
+ * TODO: Add command handlers for /dump, /focus, /wins when those features are ready:
+ *   - /dump - Brain dump mode (capture unstructured thoughts)
+ *   - /focus - Set current focus task
+ *   - /wins - Show recent tiny wins
+ */
+export async function registerCommands(): Promise<void> {
+  const commands = [
+    { command: 'start', description: 'Start the bot' },
+    { command: 'help', description: 'Show help' },
+    { command: 'reset', description: 'Reset conversation (delete agent memory)' },
+  ];
+
+  await bot.telegram.setMyCommands(commands);
+  console.log(`Registered ${String(commands.length)} bot commands with Telegram`);
+}
+
+/**
  * Register webhook with Telegram
  *
  * Called on startup when webhook mode is enabled.

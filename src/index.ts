@@ -12,7 +12,7 @@
 import { config, isWebhookMode } from './config';
 import { healthCheck, simpleHealthCheck } from './health';
 import { initializeLetta } from './letta';
-import { handleUpdate, startPolling, registerWebhook } from './bot';
+import { handleUpdate, startPolling, registerWebhook, registerCommands } from './bot';
 import { dispatchTool } from './tools';
 import type { Update } from 'telegraf/types';
 
@@ -28,6 +28,13 @@ async function main(): Promise<void> {
   } catch (error) {
     console.error('Failed to initialize Letta:', error);
     console.error('Server will start, but bot functionality may be limited.');
+  }
+
+  // Register bot commands with Telegram (sets the command menu)
+  try {
+    await registerCommands();
+  } catch (error) {
+    console.error('Failed to register commands:', error);
   }
 
   // Start the HTTP server
