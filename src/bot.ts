@@ -28,9 +28,11 @@ let agentId: string | null = null;
 const AGENT_NAME = 'adhd-support-agent';
 
 /**
- * Sync any missing tools to an existing agent
+ * Sync tools to an existing agent
  *
- * Compares registered tools with agent's attached tools and attaches any missing ones.
+ * Detaches all current tools and re-attaches the registered tools.
+ * This ensures the agent always has tools with the correct webhook URLs
+ * (important after importing an agent from a different environment).
  */
 async function syncToolsToAgent(client: ReturnType<typeof getLettaClient>, agentId: string): Promise<void> {
   const registeredToolIds = getRegisteredToolIds();
@@ -38,28 +40,32 @@ async function syncToolsToAgent(client: ReturnType<typeof getLettaClient>, agent
     return;
   }
 
-  // Get currently attached tools
-  const attachedTools = new Set<string>();
+  // Detach all currently attached tools
+  const attachedToolIds: string[] = [];
   for await (const tool of client.agents.tools.list(agentId)) {
-    attachedTools.add(tool.id);
+    attachedToolIds.push(tool.id);
   }
 
-  // Attach any missing tools
-  let attached = 0;
-  for (const toolId of registeredToolIds) {
-    if (!attachedTools.has(toolId)) {
-      try {
-        await client.agents.tools.attach(toolId, { agent_id: agentId });
-        attached++;
-      } catch (err) {
-        console.warn(`Failed to attach tool ${toolId}:`, err);
-      }
+  for (const toolId of attachedToolIds) {
+    try {
+      await client.agents.tools.detach(toolId, { agent_id: agentId });
+    } catch (err) {
+      console.warn(`Failed to detach tool ${toolId}:`, err);
     }
   }
 
-  if (attached > 0) {
-    console.log(`Attached ${String(attached)} new tools to existing agent`);
+  // Attach all registered tools (with updated source_code/webhook URLs)
+  let attached = 0;
+  for (const toolId of registeredToolIds) {
+    try {
+      await client.agents.tools.attach(toolId, { agent_id: agentId });
+      attached++;
+    } catch (err) {
+      console.warn(`Failed to attach tool ${toolId}:`, err);
+    }
   }
+
+  console.log(`Synced ${String(attached)} tools to agent (detached ${String(attachedToolIds.length)} old)`);
 }
 
 /**
