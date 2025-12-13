@@ -39,3 +39,6 @@ Caddyfile
 # Database files (SQLite)
 data/**
 !data/.gitkeep
+
+# System prompt (contains personal info)
+prompts/SYSTEM_PROMPT.md

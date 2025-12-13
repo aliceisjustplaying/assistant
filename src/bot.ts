@@ -13,6 +13,7 @@ import type { Update } from 'telegraf/types';
 import { config } from './config';
 import { detectAndParse, formatDetectionContext } from './detect';
 import { getLettaClient, getRegisteredToolIds } from './letta';
+import { loadSystemPrompt } from './prompts';
 
 /**
  * Create Telegraf bot instance
@@ -98,6 +99,9 @@ async function getOrCreateAgent(): Promise<string> {
     const toolIds = getRegisteredToolIds();
     console.log(`Will attach ${String(toolIds.length)} tools to new agent`);
 
+    // Load system prompt from file with dynamic tool injection
+    const systemPrompt = await loadSystemPrompt();
+
     // Workaround for Letta bug: openai-proxy/ handles are rejected during creation
     // but work when set via llm_config modification.
     // Step 1: Create agent with letta-free model (tools attached separately in step 3)
@@ -109,21 +113,7 @@ async function getOrCreateAgent(): Promise<string> {
       memory_blocks: [
         {
           label: 'persona',
-          value: `You are a helpful ADHD support assistant. You help users with:
-- Task management and breaking down complex tasks
-- Time management and scheduling
-- Reducing overwhelm and executive dysfunction
-- Building habits and routines
-- Managing distractions
-
-Be supportive, understanding, and practical. Keep responses concise and actionable.
-
-You have access to tools for managing tasks and items. Use them to help users:
-- parse_brain_dump: Extract tasks from free-form text
-- break_down_task: Split complex tasks into subtasks
-- save_item: Save tasks, brain dumps, or subtasks
-- update_item: Update status, priority, or content
-- get_open_items: View open tasks and brain dumps`,
+          value: systemPrompt,
         },
         {
           label: 'human',

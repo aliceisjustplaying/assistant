@@ -50,9 +50,12 @@ bun install
 
 ```bash
 cp .env.example .env
+cp prompts/SYSTEM_PROMPT.md.example prompts/SYSTEM_PROMPT.md
 ```
 
 Edit `.env` with your values (see sections below for how to get each).
+
+Edit `prompts/SYSTEM_PROMPT.md` to customize the agent's personality and behavior. The `{{TOOLS}}` placeholder is automatically replaced with the list of available tools at runtime.
 
 ### 3. Start Docker services
 
@@ -208,6 +211,7 @@ bun test --watch
 │   ├── detect.ts          # Haiku-based overwhelm/brain dump detection
 │   ├── health.ts          # Health check endpoints
 │   ├── letta.ts           # Letta client bootstrap
+│   ├── prompts.ts         # System prompt loader with tool injection
 │   ├── db/
 │   │   ├── index.ts       # Database initialization
 │   │   ├── schema.ts      # Drizzle ORM schema
@@ -220,6 +224,9 @@ bun test --watch
 │       ├── items.ts       # save_item, update_item tools
 │       ├── context.ts     # get_open_items tool
 │       └── wins.ts        # Tiny wins tools (record, delete, query)
+├── prompts/
+│   ├── SYSTEM_PROMPT.md          # Your customized system prompt (gitignored)
+│   └── SYSTEM_PROMPT.md.example  # Template to copy
 ├── scripts/
 │   ├── setup-letta-provider.ts  # Setup verification
 │   └── cleanup-agents.ts        # Delete stale Letta agents
