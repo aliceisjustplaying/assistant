@@ -59,7 +59,9 @@ services:
 
   # LiteLLM: OpenAI-compatible API that proxies to auth-adapter -> anthropic-proxy
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    # Using specific version that includes fix for tools=None bug
+    # https://github.com/BerriAI/litellm/commit/7c2e2111c0cc3372ca0ce911d0b6d45c22794d7f
+    image: ghcr.io/berriai/litellm:litellm_embedding_header_forwarding-v1.80.9.dev6
     ports:
       - '4000:4000'
     env_file: .env
