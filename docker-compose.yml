@@ -80,6 +80,9 @@ services:
       timeout: 10s
       retries: 3
 
+  # Letta: Agent framework with memory
+  # Access via Tailscale: http://TAILSCALE_IP:8283
+  # Or via Caddy (if configured): https://letta.yourdomain.com
   letta:
     image: letta/letta:latest
     ports:

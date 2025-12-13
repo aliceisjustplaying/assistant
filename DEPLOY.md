@@ -252,6 +252,44 @@ curl https://assistant.yourdomain.com/health
 
 ---
 
+## Letta Access via Tailscale
+
+Letta is accessible via Tailscale for direct API access and debugging.
+
+### Access Letta
+
+From any device on your Tailscale network, open:
+```
+http://YOUR_TAILSCALE_IP:8283
+```
+
+Or use the Tailscale hostname:
+```
+http://assistant:8283
+```
+
+### Letta ADE (Web UI)
+
+You can also connect to Letta using the official ADE (Agent Development Environment):
+
+- Go to https://app.letta.com
+- Click "Self-Hosted Server"
+- Enter: `http://YOUR_TAILSCALE_IP:8283`
+- If `LETTA_SERVER_PASSWORD` is set, enter the password
+
+### API Examples
+
+```bash
+# Health check
+curl http://YOUR_TAILSCALE_IP:8283/v1/health
+
+# List agents (with password)
+curl -H "Authorization: Bearer YOUR_LETTA_SERVER_PASSWORD" \
+  http://YOUR_TAILSCALE_IP:8283/v1/agents
+```
+
+---
+
 ## Monitoring
 
 Netdata is included for real-time monitoring, accessible via Tailscale.
@@ -381,12 +419,12 @@ Internet                              Tailscale Network
 │                    ▼                                       │
 │          ┌──────────────────┐   ┌───────────────────────┐  │
 │          │ app (Bun :3000)  │   │ netdata (:19999)      │  │
-│          │ Telegram webhook │   │ via Tailscale only    │  │
+│          │ Telegram webhook │   │ via Tailscale         │  │
 │          └────────┬─────────┘   └───────────────────────┘  │
 │                   │                                        │
 │                   ▼                                        │
 │          ┌──────────────────┐                              │
-│          │ letta (:8283)    │                              │
+│          │ letta (:8283)    │◄─── also via Tailscale      │
 │          │ Agent + Memory   │                              │
 │          └────────┬─────────┘                              │
 │                   │                                        │
