@@ -35,6 +35,7 @@ export function getRegisteredToolIds(): string[] {
 export function getLettaClient(): Letta {
   lettaClient ??= new Letta({
     baseURL: config.LETTA_BASE_URL,
+    apiKey: config.LETTA_SERVER_PASSWORD || undefined,
   });
   return lettaClient;
 }

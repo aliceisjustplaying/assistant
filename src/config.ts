@@ -51,6 +51,7 @@ export const config = {
 
   // === Letta ===
   LETTA_BASE_URL: requireEnv('LETTA_BASE_URL'),
+  LETTA_SERVER_PASSWORD: optionalEnv('LETTA_SERVER_PASSWORD', ''),
 
   // === Telegram ===
   TELEGRAM_BOT_TOKEN: requireEnv('TELEGRAM_BOT_TOKEN'),
