@@ -1,0 +1,54 @@
+#cloud-config
+# Cloud-init template for assistant server
+# Variables like __VAR_NAME__ are substituted by deploy.sh
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - git
+  - mosh
+  - jq
+
+# Write Tailscale auth key to file (avoids exposing in logs)
+write_files:
+  - path: /tmp/ts-auth-key
+    permissions: '0600'
+    content: __TS_OAUTH_SECRET__
+
+runcmd:
+  # Docker installation
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo $VERSION_CODENAME) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # Tailscale installation and auth
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - tailscale up --auth-key="$(cat /tmp/ts-auth-key)?ephemeral=false" --advertise-tags=__TS_TAG__ --hostname=assistant
+  - rm -f /tmp/ts-auth-key
+
+  # GitHub CLI installation
+  - mkdir -p /etc/apt/keyrings
+  - curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+  - chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+  - apt-get update
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y gh
+
+  # Clone repository
+  - mkdir -p /opt
+  - git clone https://github.com/__GH_REPO__.git /opt/assistant
+  - chmod +x /opt/assistant/deploy.sh
+
+  # Generate deploy key for GitHub Actions
+  - ssh-keygen -t ed25519 -f /root/.ssh/deploy_key -N "" -C "deploy@assistant"
+
+  # Signal completion
+  - touch /opt/.cloud-init-complete
+
+final_message: "Cloud-init completed after $UPTIME seconds"

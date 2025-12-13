@@ -1,6 +1,27 @@
 # Deploying to Hetzner VPS
 
-Simple deployment using Docker Compose + Caddy + GitHub Actions.
+## Automated Deployment (Recommended)
+
+Single-command deployment using `infra/deploy.sh`:
+
+```bash
+cd infra
+cp secrets.env.example secrets.env
+nano secrets.env  # Fill in your values
+./deploy.sh
+```
+
+See [infra/README.md](infra/README.md) for prerequisites (hcloud CLI, Cloudflare token, Tailscale OAuth client).
+
+The script handles: server creation, Docker setup, Tailscale, DNS, SSL, Telegram webhook, and GitHub Actions deploy key.
+
+**Only manual step:** Complete Anthropic OAuth via the URL shown in deploy output.
+
+---
+
+## Manual Deployment
+
+Step-by-step deployment using Docker Compose + Caddy + GitHub Actions.
 
 ## Prerequisites
 

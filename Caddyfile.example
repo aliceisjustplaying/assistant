@@ -1,17 +1,15 @@
 # Copy to Caddyfile and customize:
 #   cp Caddyfile.example Caddyfile
 #   nano Caddyfile
+#
+# Note: deploy.sh generates this automatically with your domain
 
 # Main app - Telegram webhook
-assistant.mosphere.at {
+assistant.yourdomain.com {
     reverse_proxy app:3000
 }
 
-# Letta ADE - password protected by Letta itself (LETTA_SERVER_PASSWORD)
-# Connect via https://app.letta.com → Self-Hosted Server
-letta.assistant.mosphere.at {
-    reverse_proxy letta:8283
-}
-
-# Netdata is accessed via Tailscale (http://TAILSCALE_IP:19999)
-# No public exposure needed
+# Internal services accessed via Tailscale only (no public exposure):
+#   http://TAILSCALE_IP:8283  - Letta API/ADE
+#   http://TAILSCALE_IP:19999 - Netdata monitoring
+#   http://TAILSCALE_IP:4001  - Anthropic Proxy (OAuth setup)

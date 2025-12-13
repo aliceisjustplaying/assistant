@@ -42,3 +42,10 @@ data/**
 
 # System prompt (contains personal info)
 prompts/SYSTEM_PROMPT.md
+
+# Infrastructure secrets
+infra/secrets.env
+infra/deploy_key_*
+
+# Environment backups (created by deploy.sh)
+.env.backup.*

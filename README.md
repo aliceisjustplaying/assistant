@@ -188,6 +188,19 @@ docker compose build --no-cache anthropic-proxy
 docker compose up -d
 ```
 
+## Deployment
+
+Deploy to Hetzner Cloud with a single command:
+
+```bash
+cd infra
+cp secrets.env.example secrets.env
+nano secrets.env  # Fill in your values
+./deploy.sh
+```
+
+See [DEPLOY.md](DEPLOY.md) for full deployment guide (automated and manual options).
+
 ## Testing
 
 ```bash
